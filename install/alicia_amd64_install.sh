@@ -16,7 +16,7 @@ if [ ! -d "$ALICIA_WS/src" ]; then
   echo "Installing Alicia Duo ROS packages..."
   mkdir -p "$ALICIA_WS/src"
   cd "$ALICIA_WS/src"
-  git clone https://gitee.com/xuanyatech/Alicia_duo_ros.git ./src/
+  git clone https://gitee.com/Xuanya-Robotics/Alicia-D-ROS1.git ./src/
   cd "$ALICIA_WS"
 
 
