@@ -1,0 +1,26 @@
+joint_state_controller:
+  type: joint_state_controller/JointStateController
+  publish_rate: 50
+  joints:
+    - Joint1
+    - Joint2
+    - Joint3
+    - Joint4
+    - Joint5
+    - Joint6
+    - right_finger
+    
+alicia_controller:
+  type: position_controllers/JointTrajectoryController
+  joints:
+    - Joint1
+    - Joint2
+    - Joint3
+    - Joint4
+    - Joint5
+    - Joint6
+
+hand_controller:
+  type: position_controllers/JointTrajectoryController
+  joints:
+    - right_finger

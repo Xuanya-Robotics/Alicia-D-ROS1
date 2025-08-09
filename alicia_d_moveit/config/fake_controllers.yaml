@@ -1,0 +1,19 @@
+controller_list:
+  - name: fake_alicia_controller
+    type: $(arg fake_execution_type)
+    joints:
+      - Joint1
+      - Joint2
+      - Joint3
+      - Joint4
+      - Joint5
+      - Joint6
+  - name: fake_hand_controller
+    type: $(arg fake_execution_type)
+    joints:
+      - right_finger
+initial:  # Define initial robot poses per group
+  - group: alicia
+    pose: home
+  - group: hand
+    pose: open

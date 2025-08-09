@@ -1,0 +1,2 @@
+DOF: 6
+joint_names: ['Joint01', 'Joint02', 'Joint03', 'Joint04', 'Joint05', 'Joint06']

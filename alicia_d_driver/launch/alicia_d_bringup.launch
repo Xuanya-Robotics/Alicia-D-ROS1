@@ -1,0 +1,83 @@
+<launch>
+  <!--
+  ===================================================================================
+  |      Main Bringup Launch File for the Alicia-D Robot with MoveIt!              |
+  ===================================================================================
+  -->
+  <arg name="moveit_controller_manager" default="moveit_simple_controller_manager/MoveItSimpleControllerManager"/>
+  <!-- Load the URDF, SRDF and other .yaml configuration files on the param server -->
+  <include file="$(find alicia_d_moveit)/launch/planning_context.launch">
+    <arg name="load_robot_description" value="true"/>
+  </include>
+
+  <!-- Load the ROS controllers configuration -->
+  <rosparam file="$(find alicia_d_driver)/config/controllers.yaml" command="load" />
+  
+  <!-- Load the MoveIt controller connection file -->
+  <rosparam file="$(find alicia_d_moveit)/config/simple_moveit_controllers.yaml"/>
+
+  <!-- =================================================================================== -->
+  <!-- |                       START THE HARDWARE AND ROS_CONTROL                          | -->
+  <!-- =================================================================================== -->
+
+  <node name="alicia_d_driver_node" pkg="alicia_d_driver" type="alicia_d_driver_node" output="screen">
+    
+      <!-- Serial Port Configuration -->
+      <param name="port"           type="string" value="/dev/ttyCH341USB0"/>
+      <param name="baud_rate"      type="int"    value="921600"/>
+      
+      <!-- Driver Behavior Configuration -->
+      <param name="debug_mode"     type="bool"   value="false"/>
+      <param name="rate_limit_sec" type="double" value="0.01"/>
+        <!-- Command streaming and smoothing -->
+        <param name="command_rate_hz"           type="double" value="300.0"/>
+        <param name="use_trajectory_smoothing"  type="bool"   value="true"/>
+        <param name="max_joint_velocity_rad_s"  type="double" value="3.0"/>
+        <param name="max_joint_accel_rad_s2"    type="double" value="12.0"/>
+        <param name="max_gripper_velocity_rad_s" type="double" value="2.0"/>
+        <param name="max_gripper_accel_rad_s2"   type="double" value="15.0"/>
+        <param name="gripper_input_is_percent"  type="bool"   value="false"/>
+        <!-- Stroke length of prismatic gripper joint (meters). Used for unit conversion. -->
+        <param name="gripper_stroke_m"          type="double" value="0.05"/>
+  </node>
+
+
+
+  <!-- Load the joint names for the hardware interface -->
+  <rosparam file="$(find alicia_d_driver)/config/joint_names.yaml" command="load" />
+  
+  <!-- Start the ros_control hardware interface node -->
+  <node name="bessica_d_hw_interface" pkg="alicia_d_driver" type="alicia_d_hw_interface_node" output="screen"/>
+
+  <!-- Load the robot state publisher. No remapping needed now. -->
+  <node name="robot_state_publisher" pkg="robot_state_publisher" type="robot_state_publisher" respawn="true" output="screen" />
+  
+  <!-- Load the controller spawner in the global namespace -->
+  <!-- Only spawn trajectory controllers. The driver already publishes /joint_states. -->
+  <node name="controller_spawner" pkg="controller_manager" type="spawner" respawn="false"
+    output="screen" args="
+      alicia_controller
+      hand_controller
+    "/>
+
+  <!-- =================================================================================== -->
+  <!-- |                                  START MOVEIT!                                  | -->
+  <!-- =================================================================================== -->
+  
+  <!-- Run the main MoveIt! planning execution context -->
+  <include file="$(find alicia_d_moveit)/launch/move_group.launch">
+    <arg name="load_robot_description" value="false"/>
+    <!-- This param tells move_group to load the ros_control plugin -->
+    <param name="moveit_controller_manager" value="$(arg moveit_controller_manager)" />
+  </include>
+
+  <!-- =================================================================================== -->
+  <!-- |                                 START VISUALIZATION                             | -->
+  <!-- =================================================================================== -->
+
+  <!-- Run RViz and load the default config to see the state of the move_group node -->
+  <include file="$(find alicia_d_moveit)/launch/moveit_rviz.launch">
+    <arg name="rviz_config" value="$(find alicia_d_moveit)/launch/moveit.rviz"/>
+  </include>
+
+</launch>

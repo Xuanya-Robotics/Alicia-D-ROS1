@@ -1,0 +1,21 @@
+<launch>
+   <node name="alicia_d_driver_node" pkg="alicia_d_driver" type="alicia_d_driver_node" output="screen">
+   
+     <!-- Serial Port Configuration -->
+     <param name="port"           type="string" value="/dev/ttyCH341USB0"/>
+     <param name="baud_rate"      type="int"    value="921600"/>
+     
+     <!-- Driver Behavior Configuration -->
+     <param name="debug_mode"     type="bool"   value="false"/>
+     <param name="rate_limit_sec" type="double" value="0.01"/>
+      <!-- Command streaming and smoothing -->
+      <param name="command_rate_hz"           type="double" value="300.0"/>
+      <param name="use_trajectory_smoothing"  type="bool"   value="true"/>
+      <param name="max_joint_velocity_rad_s"  type="double" value="3.0"/>
+      <param name="max_joint_accel_rad_s2"    type="double" value="12.0"/>
+      <param name="max_gripper_velocity_rad_s" type="double" value="2.0"/>
+      <param name="max_gripper_accel_rad_s2"   type="double" value="15.0"/>
+      <param name="gripper_input_is_percent"  type="bool"   value="false"/>
+      <param name="gripper_stroke_m"          type="double" value="0.05"/>
+   </node>
+</launch>
