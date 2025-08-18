@@ -79,11 +79,11 @@ roslaunch alicia_d_driver alicia_d_bringup.launch
 
 - USB camera calibration:
 
-    refer [Alicia-D calibration guide](alicia_d_calibration/README.md)
+    Refer [Alicia-D calibration guide](alicia_d_calibration/README.md)
 
 - Cube Sorting:
 
-    refer [Alicia-D object sorting guide](alicia_d_object_sort/README.md)
+    Refer [Alicia-D object sorting guide](alicia_d_object_sort/README.md)
 
 ## **Links**
 
