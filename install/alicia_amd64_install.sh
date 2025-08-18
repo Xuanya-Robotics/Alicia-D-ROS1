@@ -7,6 +7,7 @@ sudo apt -y autoremove
 
 # 安装依赖
 sudo apt -y install python3-serial
+sudo apt install python3-opencv
 sudo apt-get install ros-$ROS_DISTRO-usb-cam
 sudo apt-get install ros-$ROS_DISTRO-camera-calibration
 sudo apt-get install ros-$ROS_DISTRO-moveit
