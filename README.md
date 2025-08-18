@@ -76,21 +76,14 @@ roslaunch alicia_d_driver alicia_d_bringup.launch
 ```
 
 
-launch Alicia-D robot driver with moveit
-```
-roslaunch alicia_d_driver alicia_d_bringup.launch
-```
 
-- USB camera calibration
+- USB camera calibration:
 
+    refer [Alicia-D calibration guide](alicia_d_calibration/README.md)
 
-    Intrinsic calibration
+- Cube Sorting:
 
-    [Synria C10 USB Camera Calibration Guide](https://docs.sparklingrobo.com/xuanya-followerarm-teleop/intro-Alicia-D750-hand-eye-calibration-2)
-
-    Hand-on-eye calibration
-
-    refer links in `Intrinsinc calibration` section and [Alicia-D calibration guide](alicia_d_calibration/README.md)
+    refer [Alicia-D object sorting guide](alicia_d_object_sort/README.md)
 
 ## **Links**
 

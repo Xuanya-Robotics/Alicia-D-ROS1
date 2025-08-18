@@ -1,6 +1,11 @@
+## Introduction
+
+This package is for usb camera extrinsics calibration, in the case of eye in hand structure.
+
 ## Prerequisite
 
-Install hand-eye calibration ros package
+1. Install hand-eye calibration ros package
+
 ```
 mkdir -p ~/camera_ws/src
 cd ~/camera_ws
@@ -9,6 +14,13 @@ catkin_make
 source devel/setup.bash
 echo "source ~/camera_ws//devel/setup.bash" >> ~/.bashrc
 ```
+
+
+2. Calibrate Camera Intrinsic Parameters
+
+Refer [calibration guide](https://docs.sparklingrobo.com/xuanya-followerarm-teleop/intro-Alicia-D750-hand-eye-calibration-2)
+
+
 ## Usage
 
 ### Aruco Marker (Prefer)
