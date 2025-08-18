@@ -1,11 +1,11 @@
-# Alicia-D Series Robotic Arm by Xuanya Robotics
+# Alicia-D Series Robotic Arm by Synria Robotics
 
 [English Version](README.md) | [中文版](README_CH.md) | [Official Taobao Store](https://g84gtpygdv6trpvdhcsy0kfr73avcip.taobao.com/shop/view_shop.htm?appUid=RAzN8HWKU5B7MfX6JjEWgkuNfftNVbnrjbjx6fPjY9KqXB46Rvy&spm=a21n57.1.hoverItem.2) | [Alicia-D Product Manual (CN)](https://tcnqzgyay0jb.feishu.cn/wiki/ElDUwERlNilPLWkJ2e2cYGyZncb?fromScene=spaceOverview)
 
 ![Alicia-D](images/Alicia_Duo_V5_4.png)
 
 ## Overview
-The Alicia-D series by Xuanya Robotics provides a cost-effective, fully functional platform for teleoperation data collection and reproducing state-of-the-art robotic algorithms such as imitation learning (IL), reinforcement learning (RL), and vision-language-action (VLA).
+The Alicia-D series by Synria Robotics provides a cost-effective, fully functional platform for teleoperation data collection and reproducing state-of-the-art robotic algorithms such as imitation learning (IL), reinforcement learning (RL), and vision-language-action (VLA).
 This repository provides ROS 1 code and examples for the single-arm manipulator of the Alicia-D series.
 
 ## Recommended System
@@ -57,44 +57,22 @@ roslaunch alicia_d_driver alicia_d_driver.launch
 roslaunch alicia_d_driver alicia_d_bringup.launch
 ```
 
-### USB Camera Calibration
 
-- Intrinsic calibration: See the Synria C10 USB Camera Calibration Guide:
-  - `https://docs.sparklingrobo.com/xuanya-followerarm-teleop/intro-Alicia-D750-hand-eye-calibration-2`
-
-- Hand-eye calibration (eye-in-hand): Refer to the guide above and `alicia_d_calibration/README.md`. You can use either ArUco or ChArUco markers.
-
-ArUco (calibration):
-
-```bash
-roslaunch alicia_d_calibration usb_aruco_eyeonhand.launch
+launch Alicia-D robot driver with moveit
 ```
-
-Verification (with driver running):
-
-```bash
 roslaunch alicia_d_driver alicia_d_bringup.launch
 ```
 
-```bash
-roslaunch alicia_d_calibration usb_aruco_verify.launch
-```
+- USB camera calibration
+-- Intrinsic calibration
 
-ChArUco (calibration):
+[Synria C10 USB Camera Calibration Guide](https://docs.sparklingrobo.com/xuanya-followerarm-teleop/intro-Alicia-D750-hand-eye-calibration-2)
 
-```bash
-roslaunch alicia_d_calibration usb_charuco_eyeonhand.launch
-```
+-- Hand-on-eye calibration
 
-Verification:
+refer links in `Intrinsinc calibration` section documentation and [Alicia-D calibration guide](alicia_d_calibration/README.md)
 
-```bash
-roslaunch alicia_d_calibration usb_charuco_verify.launch
-```
+## **Links**
 
-In RViz, add the `TF` display to check whether the `camera_link` frame is correct.
-
-## Links
-
-- Official Taobao Store: `https://g84gtpygdv6trpvdhcsy0kfr73avcip.taobao.com/shop/view_shop.htm?appUid=RAzN8HWKU5B7MfX6JjEWgkuNfftNVbnrjbjx6fPjY9KqXB46Rvy&spm=a21n57.1.hoverItem.2`
-- Product Manual (Chinese): `https://tcnqzgyay0jb.feishu.cn/wiki/ElDUwERlNilPLWkJ2e2cYGyZncb?fromScene=spaceOverview`
+- **Official Taobao Store**: [Alicia-D by Synria Robotics on Taobao](https://g84gtpygdv6trpvdhcsy0kfr73avcip.taobao.com/shop/view_shop.htm?appUid=RAzN8HWKU5B7MfX6JjEWgkuNfftNVbnrjbjx6fPjY9KqXB46Rvy&spm=a21n57.1.hoverItem.2)
+- **Product Manual**: [Alicia-D Product Manual (Chinese)](https://tcnqzgyay0jb.feishu.cn/wiki/ElDUwERlNilPLWkJ2e2cYGyZncb?fromScene=spaceOverview)

@@ -1,4 +1,4 @@
-# Alicia-D 系列机械臂（璇亚机器人）
+# Alicia-D 系列机械臂
 
 [中文版](README_CH.md) | [English Version](README.md) | [官方淘宝店](https://g84gtpygdv6trpvdhcsy0kfr73avcip.taobao.com/shop/view_shop.htm?appUid=RAzN8HWKU5B7MfX6JjEWgkuNfftNVbnrjbjx6fPjY9KqXB46Rvy&spm=a21n57.1.hoverItem.2) | [Alicia-D 产品手册（中文）](https://tcnqzgyay0jb.feishu.cn/wiki/ElDUwERlNilPLWkJ2e2cYGyZncb?fromScene=spaceOverview)
 
@@ -15,7 +15,7 @@ Alicia-D 系列机械臂为远程操作数据采集以及复现前沿机器人�
 
 ## 安装
 
-运行安装脚本（会安装依赖并构建工作空间）：
+运行安装脚本（安装依赖并构建工作空间）：
 
 ```bash
 sh install/alicia_amd64_install.sh
@@ -57,44 +57,14 @@ roslaunch alicia_d_driver alicia_d_driver.launch
 roslaunch alicia_d_driver alicia_d_bringup.launch
 ```
 
-### USB 相机标定
+- USB 相机标定
 
-- 相机内参标定：请参考 Synria C10 相机标定指南：
-  - `https://docs.sparklingrobo.com/xuanya-followerarm-teleop/intro-Alicia-D750-hand-eye-calibration-2`
+- [相机内参标定](https://docs.sparklingrobo.com/xuanya-followerarm-teleop/intro-Alicia-D750-hand-eye-calibration-2)
 
-- 手眼标定（手持眼）：参见上述文档与 `alicia_d_calibration/README.md`，可选择 ArUco 或 ChArUco 标定板。
+- 手眼标定（眼在手）：参见[文档](alicia_d_calibration/README.md)，可选择 ArUco 或 ChArUco 标定板。
 
-ArUco（标定）：
-
-```bash
-roslaunch alicia_d_calibration usb_aruco_eyeonhand.launch
-```
-
-验证（需先启动驱动）：
-
-```bash
-roslaunch alicia_d_driver alicia_d_bringup.launch
-```
-
-```bash
-roslaunch alicia_d_calibration usb_aruco_verify.launch
-```
-
-ChArUco（标定）：
-
-```bash
-roslaunch alicia_d_calibration usb_charuco_eyeonhand.launch
-```
-
-验证：
-
-```bash
-roslaunch alicia_d_calibration usb_charuco_verify.launch
-```
-
-在 RViz 中添加 `TF` 显示以检查 `camera_link` 坐标系是否正确。
 
 ## 链接
 
-- 官方淘宝店：`https://g84gtpygdv6trpvdhcsy0kfr73avcip.taobao.com/shop/view_shop.htm?appUid=RAzN8HWKU5B7MfX6JjEWgkuNfftNVbnrjbjx6fPjY9KqXB46Rvy&spm=a21n57.1.hoverItem.2`
-- 产品手册（中文）：`https://tcnqzgyay0jb.feishu.cn/wiki/ElDUwERlNilPLWkJ2e2cYGyZncb?fromScene=spaceOverview`
+- **淘宝店铺**: [灵动 Alicia-D 官方淘宝店](https://g84gtpygdv6trpvdhcsy0kfr73avcip.taobao.com/shop/view_shop.htm?appUid=RAzN8HWKU5B7MfX6JjEWgkuNfftNVbnrjbjx6fPjY9KqXB46Rvy&spm=a21n57.1.hoverItem.2)
+- **产品手册**: [灵动 Alicia-D 产品手册](https://tcnqzgyay0jb.feishu.cn/wiki/ElDUwERlNilPLWkJ2e2cYGyZncb?fromScene=spaceOverview)
