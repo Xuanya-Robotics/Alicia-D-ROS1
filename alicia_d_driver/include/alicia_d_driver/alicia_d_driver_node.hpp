@@ -41,6 +41,7 @@ private:
    void process_serial_data_callback(const ros::TimerEvent& event);
    void reconnect_callback(const ros::TimerEvent& event);
    void send_command_timer_callback(const ros::TimerEvent& event);
+   void heartbeat_publish_callback(const ros::TimerEvent& event);
 
    // Main processing loop
    void process_serial_data();
@@ -61,6 +62,7 @@ private:
    ros::Timer processing_timer_;
    ros::Timer reconnect_timer_;
    ros::Timer command_timer_;
+   ros::Timer heartbeat_timer_;
 
    // Publishers & Subscribers
    ros::Publisher joint_state_pub_std_;
@@ -117,5 +119,9 @@ private:
     std::vector<double> cmd_joint_velocities_;  // size 6, rad/s
     double cmd_gripper_rad_ = 0.0;              // radians
     double cmd_gripper_vel_rad_s_ = 0.0;        // rad/s
+
+    // Timestamp of the last feedback received from hardware. When stale, we
+    // fall back to publishing the commanded state so visualizers remain in sync.
+    ros::Time last_feedback_time_;
 };
 #endif // ALICiA_D_DRIVER_NODE_H

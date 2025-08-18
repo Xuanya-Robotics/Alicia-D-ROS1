@@ -17,6 +17,12 @@ constexpr uint8_t FEEDBACK_SERVO_STATE = 0x04;
 constexpr uint8_t FEEDBACK_SERVO_STATE_EXT = 0x06;
 constexpr uint8_t FEEDBACK_ERROR = 0xEE;
 
+// Gripper HW mapping constants (map 0..100 deg -> 2048..3590)
+constexpr double GRIPPER_HW_MIN = 2048.0;      // Fully open
+constexpr double GRIPPER_HW_MAX = 3590.0;      // Fully closed
+constexpr double GRIPPER_DEG_MAX = 100.0;      // Logical gripper range in degrees
+constexpr double GRIPPER_HW_PER_DEG = (GRIPPER_HW_MAX - GRIPPER_HW_MIN) / GRIPPER_DEG_MAX; // ~15.42 counts/deg
+
 
 AliciaDDriverNode::AliciaDDriverNode() : pnh_("~"), last_process_time_(0.0)
 {
@@ -30,6 +36,9 @@ AliciaDDriverNode::AliciaDDriverNode() : pnh_("~"), last_process_time_(0.0)
         ROS_ERROR("Initial connection failed. Starting reconnect timer.");
         reconnect_timer_ = nh_.createTimer(ros::Duration(5.0), &AliciaDDriverNode::reconnect_callback, this);
     }
+
+    // Initialize last feedback time to now so we don't immediately consider it stale
+    last_feedback_time_ = ros::Time::now();
 }
 
 
@@ -87,6 +96,8 @@ void AliciaDDriverNode::setup_ros_communications()
     zero_calib_sub_ = nh_.subscribe("/zero_calibrate", 10, &AliciaDDriverNode::zero_calibrate_callback, this);
     demo_mode_sub_ = nh_.subscribe("/demonstration", 10, &AliciaDDriverNode::demonstration_mode_callback, this);
     processing_timer_ = nh_.createTimer(ros::Duration(0.01), &AliciaDDriverNode::process_serial_data_callback, this);
+    // Heartbeat to ensure fresh /joint_states even when hardware frames are sparse
+    heartbeat_timer_ = nh_.createTimer(ros::Duration(0.02), &AliciaDDriverNode::heartbeat_publish_callback, this);
     // Timer to send serialized commands at fixed rate, decoupled from subscriber callback
     const double command_period = 1.0 / std::max(1.0, command_rate_hz_);
     command_timer_ = nh_.createTimer(ros::Duration(command_period), &AliciaDDriverNode::send_command_timer_callback, this);
@@ -318,6 +329,28 @@ void AliciaDDriverNode::process_serial_data_callback(const ros::TimerEvent& even
     process_serial_data();
 }
 
+void AliciaDDriverNode::heartbeat_publish_callback(const ros::TimerEvent& event)
+{
+    // Republish the latest known state with a current timestamp to keep MoveIt happy
+    const ros::Time now = ros::Time::now();
+
+    // If feedback has not arrived recently, mirror commanded state into
+    // the "current" state so RViz/MoveIt does not stall with old joint values.
+    // This does not affect hardware; it only keeps visualization/monitoring fresh.
+    const double feedback_timeout = 0.1; // seconds
+    if ((now - last_feedback_time_).toSec() > feedback_timeout) {
+        std::lock_guard<std::mutex> lock(data_mutex_);
+        for (size_t i = 0; i < current_joint_positions_.size() && i < cmd_joint_angles_.size(); ++i) {
+            current_joint_positions_[i] = cmd_joint_angles_[i];
+        }
+        // Map commanded gripper radians to current for consistency
+        current_gripper_position_ = cmd_gripper_rad_;
+    }
+
+    std::lock_guard<std::mutex> lock2(data_mutex_);
+    publish_joint_state();
+}
+
 
 void AliciaDDriverNode::process_serial_data()
 {
@@ -369,6 +402,7 @@ void AliciaDDriverNode::parse_servo_states_frame(const std::vector<uint8_t>& dat
     int servos_in_frame = data_length / 2;
 
     std::lock_guard<std::mutex> lock(data_mutex_);
+    last_feedback_time_ = ros::Time::now();
     // Data Processing & State Update
     for (int i = 0; i < servos_in_frame && i < servo_count_; ++i) {
         size_t data_idx = 1 + i * 2;
@@ -403,6 +437,7 @@ void AliciaDDriverNode::parse_gripper_state_frame(const std::vector<uint8_t>& da
     }
    uint16_t gripper_hw_val = data_payload[2] | (data_payload[3] << 8);
    std::lock_guard<std::mutex> lock(data_mutex_);
+   last_feedback_time_ = ros::Time::now();
    current_gripper_position_ = hardware_value_to_rad_grip(gripper_hw_val);
    publish_joint_state();
 
@@ -554,9 +589,12 @@ uint16_t AliciaDDriverNode::rad_to_hardware_value(double angle_rad) {
 uint16_t AliciaDDriverNode::rad_to_hardware_value_grip(double angle_rad)
 {
     double angle_deg = angle_rad * 180.0 / M_PI;
-    angle_deg = std::max(0.0, std::min(100.0, angle_deg)); // Clamp to expected [0, 100] deg range
-    int hardware_value = static_cast<int>(angle_deg * 8.52 + 2048.0);
-    return std::max(2048, std::min(3590, hardware_value));
+    // Clamp to expected [0, 100] deg range
+    angle_deg = std::max(0.0, std::min(GRIPPER_DEG_MAX, angle_deg));
+    // Map 0..100deg -> 2048..3590
+    const double hw = angle_deg * GRIPPER_HW_PER_DEG + GRIPPER_HW_MIN;
+    const int hardware_value = static_cast<int>(std::round(hw));
+    return std::max(static_cast<int>(GRIPPER_HW_MIN), std::min(static_cast<int>(GRIPPER_HW_MAX), hardware_value));
 }
 
 
@@ -567,8 +605,9 @@ double AliciaDDriverNode::hardware_value_to_rad(uint16_t hw_value) {
 }
 double AliciaDDriverNode::hardware_value_to_rad_grip(uint16_t hw_value)
 {
-    hw_value = std::max(2048, std::min(3590, (int)hw_value));
-    double angle_deg = (static_cast<double>(hw_value) - 2048.0) / 8.52;
+    hw_value = std::max(static_cast<int>(GRIPPER_HW_MIN), std::min(static_cast<int>(GRIPPER_HW_MAX), (int)hw_value));
+    // Inverse map 2048..3590 -> 0..100deg
+    const double angle_deg = (static_cast<double>(hw_value) - GRIPPER_HW_MIN) / GRIPPER_HW_PER_DEG;
     return angle_deg * M_PI / 180.0; // Convert to radians
 }
 

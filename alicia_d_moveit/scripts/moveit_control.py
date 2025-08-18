@@ -13,7 +13,7 @@ from sensor_msgs.msg import JointState
 class MoveItRobotController:
 
 
-    def __init__(self, manipulator_group="alicia", gripper_group="hand", velocity=0.6):
+    def __init__(self, manipulator_group="alicia", gripper_group="hand", velocity=1.0):
         # Initialize MoveIt
         moveit_commander.roscpp_initialize(sys.argv)
         if not rospy.get_node_uri():
@@ -27,14 +27,15 @@ class MoveItRobotController:
 
         # Move groups
         self.manipulator = moveit_commander.MoveGroupCommander(manipulator_group)
-        # self.gripper = moveit_commander.MoveGroupCommander(gripper_group)
+        self.gripper = moveit_commander.MoveGroupCommander(gripper_group)
         self.robot_name = self.manipulator.get_active_joints()
         # Set velocity scaling (0.0 to 1.0)
         self.manipulator.set_max_velocity_scaling_factor(velocity)
         # self.gripper.set_max_velocity_scaling_factor(velocity)
         # set the manximum acceleration scaling factor
         self.manipulator.set_max_acceleration_scaling_factor(0.5)
-        self.manipulator.set_planner_id("RRTConnectkConfigDefault")  # 更快更稳定
+        # Match planner id with ompl_planning.yaml to avoid warnings
+        self.manipulator.set_planner_id("RRTConnectkConfigDefault")
         self.manipulator.set_planning_time(10.0)                     # 增加规划时间
         self.manipulator.set_num_planning_attempts(10)
         self.manipulator.set_goal_position_tolerance(0.01)
@@ -44,11 +45,25 @@ class MoveItRobotController:
 
 
     def move_to_pose(self, pose):
+        self.manipulator.set_pose_target(pose)
         success = self.manipulator.go(wait=True)
         self.manipulator.stop()
         self.manipulator.clear_pose_targets()
         return success
     
+    def open_gripper(self):
+        self.gripper.set_joint_value_target([0.0])
+        success = self.gripper.go(wait=True)
+        self.gripper.stop()
+        self.gripper.clear_pose_targets()
+        return success
+
+    def close_gripper(self, distance=0.05):
+        self.gripper.set_joint_value_target([distance])
+        success = self.gripper.go(wait=True)
+        self.gripper.stop()
+        self.gripper.clear_pose_targets()
+        return success
 
     def get_current_pose(self):
         """
@@ -66,11 +81,12 @@ class MoveItRobotController:
         joint_state = JointState()
         joint_state.name = self.robot_name
         joint_state.position = joint_goals
-        rospy.loginfo("Moving to joint state: %s", joint_goals)
-        # print the type of joint_goals
-        rospy.loginfo("Type of joint_goals: %s", type(joint_goals))
-        # success = self.manipulator.go(wait=True, joints=joint_state)
-        success = self.manipulator.go(joints=joint_state)
+        # rospy.loginfo("Moving to joint state: %s", joint_goals)
+        # # print the type of joint_goals
+        # rospy.loginfo("Type of joint_goals: %s", type(joint_goals))
+        # Use MoveGroupCommander joint target API
+        self.manipulator.set_joint_value_target(joint_goals)
+        success = self.manipulator.go(wait=True)
         if not success:
             rospy.logwarn("Failed to move to joint state: %s", joint_goals)
             return False
@@ -89,26 +105,145 @@ class MoveItRobotController:
     
 
 if __name__ == '__main__':
+    import time
     controller = MoveItRobotController()
 
     # 定义初始位姿（当前）
     start_pose = controller.manipulator.get_current_pose().pose
     rospy.loginfo("Current Pose: %s", start_pose)
-
-    start_state = controller.manipulator.get_current_joint_values()
-    rospy.loginfo("Current Joint State: %s", start_state)
-
     # Move to home joint state
     home_joint_state = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
     success = controller.move_to_joint_state(home_joint_state)
-    if success:
-        rospy.loginfo("Moved to home joint state successfully.")
-    else:
-        rospy.logwarn("Failed to move to home joint state.")
 
-    test_joint_state = [0.8768841033096781, 0.03452299619329406, 0.9397926741507933, 0.4334553966491409, -1.4200459100841776, -0.8661436156050982]
-    success = controller.move_to_joint_state(test_joint_state)
-    if success:
-        rospy.loginfo("Moved to test joint state successfully.")
-    else:
-        rospy.logwarn("Failed to move to test joint state.")
+    
+    current_pose = controller.get_current_pose()
+    rospy.loginfo("Current Pose: %s", current_pose)
+    current_joint_state = controller.get_current_joint_state()
+    # rospy.loginfo("Current Joint State: %s", current_joint_state)
+
+
+    # goal_pose = Pose()
+    # goal_pose.position.x = 0.2509282645230489
+    # goal_pose.position.y = 0.17561738522586529
+    # goal_pose.position.z = 0.2597247757446909
+    # goal_pose.orientation.x = -0.0026896244049182307
+    # goal_pose.orientation.y = 0.9679273860982205
+    # goal_pose.orientation.z = -0.030580947902249436
+    # goal_pose.orientation.w = 0.24934744190993252
+
+    # success = controller.move_to_pose(goal_pose)
+
+
+    """
+    x: 0.3562864818655051
+    y: 0.12518864867209947
+    z: 0.12435312631374076
+    orientation: 
+    x: 0.016529085222138674
+    y: 0.9480846094333752
+    z: -0.017864083885818078
+    w: 0.3170855361005991
+    """
+    goal_pose2 = Pose()
+    goal_pose2.position.x = 0.3562864818655051
+    goal_pose2.position.y = 0.12518864867209947
+    goal_pose2.position.z = 0.12435312631374076
+    goal_pose2.orientation.x = 0.016529085222138674
+    goal_pose2.orientation.y = 0.9480846094333752
+    goal_pose2.orientation.z = -0.017864083885818078
+    goal_pose2.orientation.w = 0.3170855361005991
+
+    success = controller.move_to_pose(goal_pose2)
+    goal_pose = goal_pose2
+
+
+    # import time
+    time.sleep(1)
+    current_pose = controller.get_current_pose()
+    rospy.loginfo("Current Pose: %s", current_pose)
+    current_joint_state = controller.get_current_joint_state()
+    # rospy.loginfo("Current Joint State: %s", current_joint_state)
+
+    # Position error (Euclidean distance)
+    pos_err_vec = np.array([
+        current_pose.position.x - goal_pose.position.x,
+        current_pose.position.y - goal_pose.position.y,
+        current_pose.position.z - goal_pose.position.z,
+    ])
+    pos_err_norm = float(np.linalg.norm(pos_err_vec))
+
+    # Orientation error as angular distance between quaternions (radians)
+    q_current = np.array([
+        current_pose.orientation.x,
+        current_pose.orientation.y,
+        current_pose.orientation.z,
+        current_pose.orientation.w,
+    ])
+    q_goal = np.array([
+        goal_pose.orientation.x,
+        goal_pose.orientation.y,
+        goal_pose.orientation.z,
+        goal_pose.orientation.w,
+    ])
+    # Ensure unit quaternions to get a valid angle
+    def _safe_normalize(q):
+        n = np.linalg.norm(q)
+        return q / n if n > 0 else q
+    q_current = _safe_normalize(q_current)
+    q_goal = _safe_normalize(q_goal)
+    dot = float(np.clip(np.abs(np.dot(q_current, q_goal)), 0.0, 1.0))
+    ori_err_angle = float(2.0 * np.arccos(dot))
+
+    rospy.loginfo("Position error (m): %s (vec=%s)", pos_err_norm, pos_err_vec.tolist())
+    rospy.loginfo("Orientation error (rad): %s", ori_err_angle)
+
+
+    # home_pose = Pose()
+    # home_pose.position.x = 0.3030751767830126
+    # home_pose.position.y = -0.0058612683155047415
+    # home_pose.position.z = 0.09241779076928698
+    # home_pose.orientation.x = 0.005396363743494485
+    # home_pose.orientation.y = 0.9355784757720703
+    # home_pose.orientation.z = -0.004777521009915025
+    # home_pose.orientation.w = 0.35304528069832297
+
+    # success = controller.move_to_pose(home_pose)
+    # time.sleep(1)
+    # # calculate the error;
+    # current_pose = controller.get_current_pose()
+    # # Position error (Euclidean distance)
+    # pos_err_vec = np.array([
+    #     current_pose.position.x - home_pose.position.x,
+    #     current_pose.position.y - home_pose.position.y,
+    #     current_pose.position.z - home_pose.position.z,
+    # ])
+    # # euclidean distance
+    # pos_err_euclidean = float(np.linalg.norm(pos_err_vec))
+    # pos_err_norm = float(np.linalg.norm(pos_err_vec))
+
+    # # Orientation error as angular distance between quaternions (radians)
+    # q_current = np.array([
+    #     current_pose.orientation.x,
+    #     current_pose.orientation.y,
+    #     current_pose.orientation.z,
+    #     current_pose.orientation.w,
+    # ])
+    # q_home = np.array([
+    #     home_pose.orientation.x,
+    #     home_pose.orientation.y,
+    #     home_pose.orientation.z,
+    #     home_pose.orientation.w,
+    # ])
+    # def _safe_normalize(q):
+    #     n = np.linalg.norm(q)
+    #     return q / n if n > 0 else q
+    # q_current = _safe_normalize(q_current)
+    # q_home = _safe_normalize(q_home)
+    # dot = float(np.clip(np.abs(np.dot(q_current, q_home)), 0.0, 1.0))
+    # ori_err_angle = float(2.0 * np.arccos(dot))
+
+    # rospy.loginfo("Position error (m): %s (vec=%s)", pos_err_norm, pos_err_vec.tolist())
+    # rospy.loginfo("Orientation error (rad): %s", ori_err_angle)
+
+
+

@@ -1,0 +1,76 @@
+<?xml version="1.0"?>
+<launch>
+    <!-- <arg name="eye_on_hand" doc="eye-on-hand instead of eye-on-base" /> -->
+    <arg name="eye_on_hand" value="true" /> <!-- 确认是 Eye-on-Hand -->
+    <arg name="verify" default="false" />
+    <arg name="namespace_prefix" default="usb_handeyecalibration" />
+    <arg if="$(arg eye_on_hand)" name="namespace" value="$(arg namespace_prefix)_eye_on_hand" />
+    <!-- <arg if="$(arg eye_on_hand)" name="namespace" value="$(arg namespace_prefix)_eye_on_hand" /> -->
+    <!-- <arg unless="$(arg eye_on_hand)" name="namespace" value="$(arg namespace_prefix)_eye_on_base" /> -->
+    <!--it is possible to override the link names saved in the yaml file in case of name clashes, for example-->
+    <arg if="$(arg eye_on_hand)" name="robot_effector_frame" default="" />
+    <arg unless="$(arg eye_on_hand)" name="robot_base_frame" default="base_link" />
+    <arg name="tracking_base_frame" default="camera_link" />
+    
+    <arg name="inverse" default="false" />
+    <arg name="calibration_file" default="" />
+    
+    <!-- ChArUco board parameters -->
+    <arg name="board_width" doc="Number of squares in width direction" default="11"/>
+    <arg name="board_height" doc="Number of squares in height direction" default="8"/>
+    <arg name="square_length" doc="Length of a square in meters" default="0.015"/>
+    <arg name="marker_length" doc="Length of the markers in meters" default="0.011"/>
+    
+    <arg name="marker_size" doc="Size of the ArUco marker used, in meters" default="0.02"/>
+    <arg name="marker_id" doc="The ID of the ArUco marker used" default="100"/>
+
+    <!-- ============================================================== -->
+    <!-- ==                 启动 usb camera                    == -->
+    <!-- ============================================================== -->
+    <include file="$(find usb_cam)/launch/usb_cam-test.launch" />
+
+    <!--publish hand-eye calibration-->
+    <group ns="$(arg namespace)">
+        <param name="eye_on_hand" value="$(arg eye_on_hand)" />
+        <param unless="$(arg eye_on_hand)" name="robot_base_frame" value="$(arg robot_base_frame)" />
+        <param if="$(arg eye_on_hand)" name="robot_effector_frame" value="$(arg robot_effector_frame)" />
+        <param name="tracking_base_frame" value="$(arg tracking_base_frame)" />
+        <param name="inverse" value="$(arg inverse)" />
+        <param name="calibration_file" value="$(arg calibration_file)" />
+        <node name="$(anon handeye_publisher)" pkg="easy_handeye" type="publish.py" output="screen"/>
+    </group>
+
+    <node pkg="tf" type="static_transform_publisher" name="camera_link_to_optical_frame_broadcaster"
+        args="0.0 0.0 0.0 -1.570796 0 -1.570796 camera_link camera_color_optical_frame 100" /> 
+        <!-- 这个通常是固定的旋转，RPY=(0, -pi/2, -pi/2) 是常见约定  -->
+    
+    <!-- ============================================================== -->
+    <!-- ==                    启动 ChArUco Tracker                  == -->
+    <!-- ============================================================== -->
+    <node name="charuco_tracker" pkg="alicia_d_calibration" type="charuco_tracker.py" output="screen">
+        <param name="board_size" value="[$(arg board_width), $(arg board_height)]"/>
+        <param name="square_length" value="$(arg square_length)"/>
+        <param name="marker_length" value="$(arg marker_length)"/>
+        <param name="dictionary_id" value="DICT_4X4_100"/>
+        <param name="camera_frame" value="camera_link"/>
+        <param name="board_frame" value="charuco_board"/>
+        <remap from="/camera_info" to="/camera/color/camera_info" />
+        <remap from="/image" to="/camera/color/image_raw" />
+    </node>
+
+    <!-- Conditionally launch ArUco tracker for compatibility -->
+    <node name="aruco_tracker" pkg="aruco_ros" type="single">
+        <remap from="/camera_info" to="/camera/color/camera_info" />
+        <remap from="/image" to="/camera/color/image_raw" />
+        <param name="image_is_rectified" value="true"/>
+        <param name="marker_size"        value="$(arg marker_size)"/>
+        <param name="marker_id"          value="$(arg marker_id)"/>
+        
+        <!-- ArUco 结果相对于 camera_link 发布 (使用正确的相机坐标系名称) -->
+        <param name="reference_frame"    value="camera_link"/>
+        <param name="camera_frame"       value="camera_color_optical_frame"/>
+        
+        <!-- 发布的标记坐标系名称 -->
+        <param name="marker_frame"       value="camera_marker" />
+    </node>
+</launch>
