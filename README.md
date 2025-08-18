@@ -82,13 +82,13 @@ roslaunch alicia_d_driver alicia_d_bringup.launch
 ```
 
 - USB camera calibration
--- Intrinsic calibration
+    Intrinsic calibration
 
-[Synria C10 USB Camera Calibration Guide](https://docs.sparklingrobo.com/xuanya-followerarm-teleop/intro-Alicia-D750-hand-eye-calibration-2)
+    [Synria C10 USB Camera Calibration Guide](https://docs.sparklingrobo.com/xuanya-followerarm-teleop/intro-Alicia-D750-hand-eye-calibration-2)
 
--- Hand-on-eye calibration
+    Hand-on-eye calibration
 
-refer links in `Intrinsinc calibration` section documentation and [Alicia-D calibration guide](alicia_d_calibration/README.md)
+    refer links in `Intrinsinc calibration` section and [Alicia-D calibration guide](alicia_d_calibration/README.md)
 
 ## **Links**
 

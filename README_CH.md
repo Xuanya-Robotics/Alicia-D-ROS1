@@ -71,15 +71,15 @@ roslaunch alicia_d_driver alicia_d_driver.launch
 
 - 启动 Alicia-D 驱动并加载 MoveIt：
 
-```bash
+```
 roslaunch alicia_d_driver alicia_d_bringup.launch
 ```
 
 - USB 相机标定
 
-- [相机内参标定](https://docs.sparklingrobo.com/xuanya-followerarm-teleop/intro-Alicia-D750-hand-eye-calibration-2)
+    [相机内参标定](https://docs.sparklingrobo.com/xuanya-followerarm-teleop/intro-Alicia-D750-hand-eye-calibration-2)
 
-- 手眼标定（眼在手）：参见[文档](alicia_d_calibration/README.md)，可选择 ArUco 或 ChArUco 标定板。
+    手眼标定（眼在手）：参见[文档](alicia_d_calibration/README.md)，可选择 ArUco 或 ChArUco 标定板。
 
 
 ## 链接
