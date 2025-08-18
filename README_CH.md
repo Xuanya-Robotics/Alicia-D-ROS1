@@ -18,7 +18,10 @@ Alicia-D 系列机械臂为远程操作数据采集以及复现前沿机器人�
 运行安装脚本（安装依赖并构建工作空间）：
 
 ```bash
-sh install/alicia_amd64_install.sh
+mkdir -p alicia_ws/src
+cd alicia_ws
+git clone https://github.com/Synria-Robotics/Alicia-D-ROS1.git -b v5.5.0 ./src/
+./src/install/alicia_amd64_install.sh
 ```
 
 ## 仓库结构
@@ -44,6 +47,21 @@ sh install/alicia_amd64_install.sh
 - `alicia_d_object_sort`：多色方块抓取与分拣示例
 
 ## 使用方法
+
+- 设置串口权限
+
+```bash
+sudo usermod -a -G dialout $USER
+# 设置后需要重新登录
+
+# 临时设置
+sudo chmod 666 /dev/ttyUSB*
+```
+
+- 检查硬件连接
+```bash
+ls -l /dev/ttyUSB*
+```
 
 - 仅启动 Alicia-D 驱动：
 

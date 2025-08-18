@@ -18,7 +18,10 @@ This repository provides ROS 1 code and examples for the single-arm manipulator 
 Run the install script (it installs required dependencies and builds the workspace):
 
 ```bash
-sh install/alicia_amd64_install.sh
+mkdir -p alicia_ws/src
+cd alicia_ws
+git clone https://github.com/Synria-Robotics/Alicia-D-ROS1.git -b v5.5.0 ./src/
+./src/install/alicia_amd64_install.sh
 ```
 
 ## Repository Structure
@@ -44,6 +47,21 @@ This repository contains several directories, each including ROS packages and re
 - `alicia_d_object_sort`: Multi-color cube sorting demo
 
 ## Usage
+
+- Set serial port permission
+
+```
+sudo usermod -a -G dialout $USER
+# log out after setting
+
+# temporarily setting
+sudo chmod 666 /dev/ttyUSB*
+```
+- Check the hardware connection
+```
+ls -l /dev/ttyUSB*
+```
+
 
 - Start the Alicia-D driver only:
 

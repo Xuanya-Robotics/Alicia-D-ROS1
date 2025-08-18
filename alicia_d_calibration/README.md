@@ -1,4 +1,4 @@
-## Pre-resquistes
+## Prerequisite
 
 Install hand-eye calibration ros package
 ```
