@@ -9,7 +9,7 @@ This package is for usb camera extrinsics calibration, in the case of eye in han
 ```
 mkdir -p ~/camera_ws/src
 cd ~/camera_ws
-git clone https://github.com/IFL-CAMP/easy_handeye.git
+git clone https://github.com/IFL-CAMP/easy_handeye.git ./src/
 catkin_make
 source devel/setup.bash
 echo "source ~/camera_ws//devel/setup.bash" >> ~/.bashrc

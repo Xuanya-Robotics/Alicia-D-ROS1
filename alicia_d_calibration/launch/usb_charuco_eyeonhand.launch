@@ -36,6 +36,7 @@
     <include file="$(find easy_handeye)/launch/calibrate.launch" >
         <arg name="namespace_prefix" value="$(arg namespace_prefix)" />
         <arg name="eye_on_hand" value="true" /> <!-- 确认是 Eye-in-Hand -->
+        <arg name="move_group" value="alicia" />
 
         <!-- 相机基础坐标系 (TF由此发布) -->
         <arg name="tracking_base_frame" value="camera_link" />

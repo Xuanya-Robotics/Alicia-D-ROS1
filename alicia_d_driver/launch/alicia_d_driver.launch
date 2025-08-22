@@ -1,8 +1,9 @@
 <launch>
+    <arg name="serial_port" default="/dev/ttyUSB0" />
    <node name="alicia_d_driver_node" pkg="alicia_d_driver" type="alicia_d_driver_node" output="screen">
    
      <!-- Serial Port Configuration -->
-     <param name="port"           type="string" value="/dev/ttyCH341USB0"/>
+     <param name="port"           type="string" value="$(arg serial_port)"/>
      <param name="baud_rate"      type="int"    value="921600"/>
      
      <!-- Driver Behavior Configuration -->
