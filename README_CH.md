@@ -69,6 +69,17 @@ ls -l /dev/ttyUSB*
 roslaunch alicia_d_driver alicia_d_driver.launch
 ```
 
+自定义串口端口和分辨率
+```
+roslaunch alicia_d_driver alicia_d_driver.launch port:=/dev/ttyCH341USB0 baud_rate:=1000000
+```
+关节验证：
+```bash
+rostopic echo /joint_states
+```
+
+
+
 - 启动 Alicia-D 驱动并加载 MoveIt：
 
 ```

@@ -55,7 +55,7 @@ void AliciaDDriverNode::load_parameters()
     std::string port;
     int baud_rate;
     
-    pnh_.param<std::string>("port", port, "/dev/ttyCH341USB0");
+    pnh_.param<std::string>("port", port, "/dev/ttyUSB0");
     pnh_.param<int>("baud_rate", baud_rate, 921600);
     pnh_.param<int>("servo_count", servo_count_, 9);
     pnh_.param<bool>("debug_mode", debug_mode_, false);

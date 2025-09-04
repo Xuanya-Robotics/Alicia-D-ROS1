@@ -5,7 +5,8 @@
   ===================================================================================
   -->
   <arg name="moveit_controller_manager" default="moveit_simple_controller_manager/MoveItSimpleControllerManager"/>
-  <arg name="serial_port" default="/dev/ttyUSB0" />
+  <arg name="port" default="/dev/ttyUSB0" />
+  <arg name="baud_rate" default="1000000" />
   <!-- Load the URDF, SRDF and other .yaml configuration files on the param server -->
   <include file="$(find alicia_d_moveit)/launch/planning_context.launch">
     <arg name="load_robot_description" value="true"/>
@@ -24,8 +25,8 @@
   <node name="alicia_d_driver_node" pkg="alicia_d_driver" type="alicia_d_driver_node" output="screen">
     
       <!-- Serial Port Configuration -->
-      <param name="port"           type="string" value="$(arg serial_port)"/>
-      <param name="baud_rate"      type="int"    value="921600"/>
+      <param name="port"           type="string" value="$(arg port)"/>
+      <param name="baud_rate"      type="int"    value="$(arg baud_rate)"/>
       
       <!-- Driver Behavior Configuration -->
       <param name="debug_mode"     type="bool"   value="false"/>
@@ -33,7 +34,7 @@
         <!-- Command streaming and smoothing -->
         <param name="command_rate_hz"           type="double" value="300.0"/>
         <param name="use_trajectory_smoothing"  type="bool"   value="true"/>
-        <param name="max_joint_velocity_rad_s"  type="double" value="3.0"/>
+        <param name="max_joint_velocity_rad_s"  type="double" value="1.5"/>
         <param name="max_joint_accel_rad_s2"    type="double" value="12.0"/>
         <param name="max_gripper_velocity_rad_s" type="double" value="2.0"/>
         <param name="max_gripper_accel_rad_s2"   type="double" value="15.0"/>

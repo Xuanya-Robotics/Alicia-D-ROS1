@@ -1,10 +1,11 @@
 <launch>
-    <arg name="serial_port" default="/dev/ttyUSB0" />
+   <arg name="port" default="/dev/ttyUSB0" />
+   <arg name="baud_rate" default="1000000" />
    <node name="alicia_d_driver_node" pkg="alicia_d_driver" type="alicia_d_driver_node" output="screen">
    
      <!-- Serial Port Configuration -->
-     <param name="port"           type="string" value="$(arg serial_port)"/>
-     <param name="baud_rate"      type="int"    value="921600"/>
+     <param name="port"           type="string" value="$(arg port)"/>
+     <param name="baud_rate"      type="int"    value="$(arg baud_rate)"/>
      
      <!-- Driver Behavior Configuration -->
      <param name="debug_mode"     type="bool"   value="false"/>

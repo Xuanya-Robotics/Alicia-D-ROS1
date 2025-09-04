@@ -68,6 +68,38 @@ ls -l /dev/ttyUSB*
 ```bash
 roslaunch alicia_d_driver alicia_d_driver.launch
 ```
+Default serial port and baudrate is /dev/ttyUSB0 and 1000000 separately.
+For custom usage, running like the following:
+```
+roslaunch alicia_d_driver alicia_d_driver.launch port:=/dev/ttyCH341USB0 baud_rate:=1000000
+```
+
+Verify:
+Open another termial, run the following:
+```
+rostopic echo /joint_states
+```
+The result would similar to following format:
+```
+header: 
+  seq: 903
+  stamp: 
+    secs: 1756968284
+    nsecs: 232176930
+  frame_id: ''
+name: 
+  - Joint1
+  - Joint2
+  - Joint3
+  - Joint4
+  - Joint5
+  - Joint6
+  - right_finger
+position: [-0.011507665397765016, -0.01457637617050229, -0.006904599238658614, 0.002301533079553202, -0.008438954625027745, 0.0007671776931840699, 0.0001297016861219196]
+velocity: []
+effort: []
+```
+
 
 - Start the Alicia-D driver with MoveIt:
 
@@ -75,6 +107,8 @@ roslaunch alicia_d_driver alicia_d_driver.launch
 roslaunch alicia_d_driver alicia_d_bringup.launch
 ```
 
+Example of customized usage:
+```
 
 
 - USB camera calibration:
