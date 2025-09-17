@@ -1,0 +1,19 @@
+<launch>
+    <arg name="enable_teaching" default="true" />
+    <arg name="teaching_duration" default="10" />
+    <arg name="speed_factor" default="1.0" />
+    
+    <!-- 启动拖动示教模式节点 -->
+    <node name="demo_mode" pkg="alicia_d_drag_teaching" type="demo_mode.py" output="screen">
+        <!-- 使用arg变量的值设置参数 -->
+        <param name="enable_demo" value="$(arg enable_teaching)" />
+        <!-- 使用 respawn 参数，当节点崩溃时自动重启 -->
+        <param name="respawn" value="true" />
+    </node>
+    <!-- 启动拖动示教 -->
+    <node name="pose_recorder" pkg="alicia_d_drag_teaching" type="pose_record.py" output="screen" required="false">
+        <param name="record_duration" value="$(arg teaching_duration)" />
+        <param name="enable_replay" value="true" />
+    </node>
+
+</launch>
