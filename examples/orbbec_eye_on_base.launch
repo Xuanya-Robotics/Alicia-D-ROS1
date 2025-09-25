@@ -1,0 +1,62 @@
+<launch>
+    <arg name="namespace_prefix" default="orbbec_handeyecalibration" />
+
+    <arg name="marker_size" doc="Size of the ArUco marker used, in meters" default="0.1"/>
+    <arg name="marker_id" doc="The ID of the ArUco marker used" default="100"/>
+
+    <!-- ============================================================== -->
+    <!-- ==                 启动机械臂的moveit控制                    == -->
+    <!-- ============================================================== -->
+
+    <include file="$(find alicia_d_driver)/launch/alicia_d_bringup.launch">
+    </include>
+
+    <!-- ============================================================== -->
+    <!-- ==                 启动 Orbbec Camera                     == -->
+    <!-- ============================================================== -->
+    <include file="$(find orbbec_camera)/launch/dabai_dcw.launch">
+    </include>
+
+    <!-- ============================================================== -->
+    <!-- ==                       启动 ArUco                         == -->
+    <!-- ============================================================== -->
+    <node name="aruco_tracker" pkg="aruco_ros" type="single">
+        <remap from="/camera_info" to="/camera/color/camera_info" />
+        <remap from="/image" to="/camera/color/image_raw" />
+        <param name="image_is_rectified" value="true"/>
+        <param name="marker_size"        value="$(arg marker_size)"/>
+        <param name="marker_id"          value="$(arg marker_id)"/>
+        
+        <!-- ArUco 结果相对于 camera_link 发布 (使用正确的相机坐标系名称) -->
+        <param name="reference_frame"    value="camera_link"/>
+        <!-- RealSense D405 的彩色相机光学坐标系名称 -->
+        <param name="camera_frame"       value="camera_link"/>
+        <!-- <param name="camera_frame"       value="camera_color_optical_frame"/> -->
+        
+        <!-- 发布的标记坐标系名称 -->
+        <param name="marker_frame"       value="camera_marker" />
+    </node>
+
+    <!-- ============================================================== -->
+    <!-- ==                    启动 easy_handeye                     == -->
+    <!-- ============================================================== -->
+    <include file="$(find easy_handeye)/launch/calibrate.launch" >
+        <arg name="namespace_prefix" value="$(arg namespace_prefix)" />
+        <arg name="eye_on_hand" value="false" /> <!-- Eye-on-Base 配置 -->
+
+        <!-- 相机基础坐标系 (TF由此发布) -->
+        <arg name="tracking_base_frame" value="camera_link" />
+        <!-- 检测到的标记坐标系 (由 ArUco 发布) -->
+        <arg name="tracking_marker_frame" value="camera_marker" />
+        <!-- 机器人基坐标系 -->
+        <arg name="robot_base_frame" value="base_link" />
+        <!-- **标记附着**在哪个连杆上 -->
+        <arg name="robot_effector_frame" value="tool0" /> 
+        <!-- tcp_link or Link06 -->
+
+        <arg name="freehand_robot_movement" value="false" />
+        <arg name="robot_velocity_scaling" value="0.5" />
+        <arg name="robot_acceleration_scaling" value="0.2" />
+    </include>
+
+</launch>

@@ -14,6 +14,7 @@ sudo apt-get install ros-$ROS_DISTRO-aruco-detect
 sudo apt-get install ros-$ROS_DISTRO-aruco-ros
 sudo apt-get install ros-$ROS_DISTRO-ros-control
 sudo apt-get install ros-$ROS_DISTRO-ros-controllers
+sudo apt-get install ros-$ROS_DISTRO-serial
 sudo apt install ros-$ROS_DISTRO-moveit \
                  ros-$ROS_DISTRO-moveit-planners-ompl \
                  ros-$ROS_DISTRO-pilz-industrial-motion-planner \
