@@ -1,14 +1,16 @@
 <launch>
+   <!-- <arg name="port" default="/dev/ttyCH341USB0" /> -->
    <arg name="port" default="/dev/ttyUSB0" />
-   <arg name="baud_rate" default="1000000" />
+   <arg name="baudrate" default="1000000" />
+   <arg name="debug_mode" default="false" />
    <node name="alicia_d_driver_node" pkg="alicia_d_driver" type="alicia_d_driver_node" output="screen">
    
      <!-- Serial Port Configuration -->
      <param name="port"           type="string" value="$(arg port)"/>
-     <param name="baud_rate"      type="int"    value="$(arg baud_rate)"/>
+     <param name="baud_rate"      type="int"    value="$(arg baudrate)"/>
      
      <!-- Driver Behavior Configuration -->
-     <param name="debug_mode"     type="bool"   value="false"/>
+     <param name="debug_mode"     type="bool"   value="$(arg debug_mode)"/>
      <param name="rate_limit_sec" type="double" value="0.01"/>
       <!-- Command streaming and smoothing -->
       <param name="command_rate_hz"           type="double" value="300.0"/>

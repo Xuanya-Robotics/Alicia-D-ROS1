@@ -93,7 +93,7 @@ roslaunch alicia_d_driver alicia_d_bringup.launch
     手眼标定（眼在手）：参见[文档](alicia_d_calibration/README.md)，可选择 ArUco 或 ChArUco 标定板。
 
 - 物体分拣
-    参考[文档](alicia_d_object_sort/README_CH.md)
+    参考[文档](alicia_d_object_sort/README_CN.md)
 
 ## 链接
 

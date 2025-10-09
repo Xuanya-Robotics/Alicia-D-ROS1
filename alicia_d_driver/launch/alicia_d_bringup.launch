@@ -6,7 +6,7 @@
   -->
   <arg name="moveit_controller_manager" default="moveit_simple_controller_manager/MoveItSimpleControllerManager"/>
   <arg name="port" default="/dev/ttyUSB0" />
-  <arg name="baud_rate" default="1000000" />
+  <arg name="baudrate" default="1000000" />
   <!-- Load the URDF, SRDF and other .yaml configuration files on the param server -->
   <include file="$(find alicia_d_moveit)/launch/planning_context.launch">
     <arg name="load_robot_description" value="true"/>
@@ -26,7 +26,7 @@
     
       <!-- Serial Port Configuration -->
       <param name="port"           type="string" value="$(arg port)"/>
-      <param name="baud_rate"      type="int"    value="$(arg baud_rate)"/>
+      <param name="baud_rate"      type="int"    value="$(arg baudrate)"/>
       
       <!-- Driver Behavior Configuration -->
       <param name="debug_mode"     type="bool"   value="false"/>
