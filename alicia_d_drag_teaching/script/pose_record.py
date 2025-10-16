@@ -17,8 +17,8 @@ import termios
 import rosbag
 import subprocess
 from std_msgs.msg import Bool
+from sensor_msgs.msg import JointState
 from std_srvs.srv import SetBool, SetBoolRequest
-from alicia_duo_driver.msg import ArmJointState
 
 
 class PoseRecorder:
@@ -37,7 +37,7 @@ class PoseRecorder:
         # 订阅关节状态主题
         self.joint_states_sub = rospy.Subscriber(
             '/joint_states', 
-            ArmJointState, 
+            JointState, 
             self.joint_states_callback
         )
         
@@ -49,6 +49,7 @@ class PoseRecorder:
         self.recording = False
         self.bag = None
         self.message_count = 0
+        self.exit_requested = False  # 添加退出标志
         
         # 输出初始化信息
         rospy.loginfo("姿态记录器已初始化，正在监听 /joint_states 主题")
@@ -62,7 +63,7 @@ class PoseRecorder:
         处理接收到的关节状态消息
         
         Args:
-            msg (ArmJointState): 接收到的关节状态消息
+            msg (JointState): 接收到的关节状态消息
         """
         if not (self.recording and self.bag):
             return
@@ -70,7 +71,8 @@ class PoseRecorder:
         try:
             # 将消息写入bag文件
             current_time = rospy.Time.now()
-            self.bag.write('/recorded_arm_joint_state', msg, current_time)
+            self.bag.write('/recorded_joint_states', msg, current_time)
+            self.message_count += 1
 
         except Exception as e:
             rospy.logerr("记录数据时出错: %s", str(e))
@@ -79,7 +81,9 @@ class PoseRecorder:
         """开始记录关节状态数据"""
         try:
             # Ensure the demo mode is enabled
-            for _ in range(3):
+            rospy.loginfo("请拖住机械臂进行示教， 按 'Enter' 键确认")
+            input()
+            for _ in range(4):
                 self.demo_pub.publish(Bool(data=True))
                 rospy.sleep(0.5)
             # 创建并打开bag文件
@@ -91,8 +95,12 @@ class PoseRecorder:
             
             # 根据配置设置记录结束方式
             if self.record_duration:
+                rospy.loginfo("将在 %.2f 秒后自动停止，按 'q' 键可提前退出", self.record_duration)
                 rospy.Timer(rospy.Duration(self.record_duration), self._timer_callback, oneshot=True)
+                # 启动键盘监听器以便提前退出
+                threading.Thread(target=self._keyboard_listener).start()
             else:
+                rospy.loginfo("按 's' 键停止记录，按 'q' 键退出程序")
                 threading.Thread(target=self._keyboard_listener).start()
                 
         except Exception as e:
@@ -115,12 +123,20 @@ class PoseRecorder:
             
             while self.recording:
                 # 读取单个字符
-                if sys.stdin.read(1) == 's':
+                key = sys.stdin.read(1)
+                if key == 's':
                     # 恢复终端设置（在停止记录前）
                     termios.tcsetattr(sys.stdin, termios.TCSADRAIN, old_settings)
                     self.stop_recording()
                     break
-                rospy.sleep(0.1)
+                elif key == 'q':
+                    # 恢复终端设置并退出程序
+                    termios.tcsetattr(sys.stdin, termios.TCSADRAIN, old_settings)
+                    rospy.loginfo("用户选择退出程序")
+                    self.exit_requested = True  # 设置退出标志
+                    self.stop_recording()
+                    break
+                rospy.sleep(0.01)
                 
         except Exception as e:
             rospy.logerr("键盘监听器出错: %s", str(e))
@@ -163,7 +179,7 @@ class PoseRecorder:
             if not self.record_duration:
                 rospy.loginfo("未启用姿态还原功能或无有效数据，程序退出")
                 rospy.sleep(1.0)
-                sys.exit(0)
+                rospy.signal_shutdown("记录已完成")
             else:
                 rospy.signal_shutdown("记录已完成")
 
@@ -173,7 +189,7 @@ class PoseRecorder:
             if os.path.exists(self.bag_file):
                 bag = rosbag.Bag(self.bag_file)
                 info = bag.get_type_and_topic_info()
-                topic_info = info.topics.get('/recorded_arm_joint_state')
+                topic_info = info.topics.get('/recorded_joint_states')
                 bag.close()
                 if topic_info:
                     return topic_info.message_count
@@ -204,10 +220,10 @@ class PoseRecorder:
             
             # 获取bag基本信息
             info = bag.get_type_and_topic_info()
-            topic_info = info.topics.get('/recorded_arm_joint_state')
+            topic_info = info.topics.get('/recorded_joint_states')
             
             if topic_info:
-                rospy.loginfo("主题: /recorded_arm_joint_state")
+                rospy.loginfo("主题: /recorded_joint_states")
                 rospy.loginfo("消息类型: %s", topic_info.msg_type)
                 rospy.loginfo("消息数量: %d", topic_info.message_count)
                 rospy.loginfo("开始时间: %s", bag.get_start_time())
@@ -219,11 +235,11 @@ class PoseRecorder:
             # 显示前几条消息
             rospy.loginfo("前5条消息预览:")
             count = 0
-            for topic, msg, t in bag.read_messages(topics=['/recorded_arm_joint_state']):
+            for topic, msg, t in bag.read_messages(topics=['/recorded_joint_states']):
                 if count < 5:
-                    rospy.loginfo("[%s] J1=%.4f, J2=%.4f, J3=%.4f, J4=%.4f, J5=%.4f, J6=%.4f, Gripper=%.4f", 
-                                t.to_sec(), msg.joint1, msg.joint2, msg.joint3,
-                                msg.joint4, msg.joint5, msg.joint6, msg.gripper)
+                    joint_positions = msg.position if len(msg.position) >= 6 else [0]*6
+                    rospy.loginfo("[%s] Joints: %s", 
+                                t.to_sec(), [round(pos, 4) for pos in joint_positions])
                 count += 1
                 if count >= 5:
                     break
@@ -268,11 +284,12 @@ class PoseRecorder:
                     # 延迟一点时间，确保消息能被输出
                     rospy.sleep(1.0)
                     # 正常退出
-                    sys.exit(0)
+                    self.exit_requested = True
+                    rospy.signal_shutdown("姿态还原已启动")
                 else:
                     rospy.loginfo("用户取消姿态还原")
-                    rospy.sleep(1.0)
-                    sys.exit(0)
+                    self.exit_requested = True
+                    rospy.signal_shutdown("用户取消姿态还原")
             else:
                 # 使用普通输入方式
                 rospy.loginfo("请按 Enter 键确认或按 Ctrl+C 取消...")
@@ -285,20 +302,23 @@ class PoseRecorder:
                 self._start_replicator()
                 rospy.loginfo("姿态记录器退出...")
                 rospy.sleep(1.0)
-                sys.exit(0)
+                self.exit_requested = True
+                rospy.signal_shutdown("姿态还原已启动")
                     
         except KeyboardInterrupt:
             rospy.loginfo("用户取消姿态还原")
-            sys.exit(0)
+            self.exit_requested = True
+            rospy.signal_shutdown("用户取消姿态还原")
         except Exception as e:
             rospy.logerr("获取用户输入时出错: %s", str(e))
-            sys.exit(1)
+            self.exit_requested = True
+            rospy.signal_shutdown("获取用户输入时出错")
 
     def _start_replicator(self):
         """启动姿态还原节点"""
         try:
             # 使用系统命令直接启动pose_replicator
-            cmd = ["rosrun", "alicia_duo_drag_teaching", "pose_replicator.py", 
+            cmd = ["rosrun", "alicia_d_drag_teaching", "pose_replicator.py", 
                 "_speed_factor:=" + str(rospy.get_param("~speed_factor", 1.0))]
             
             # 使用subprocess启动进程，不等待其完成
@@ -307,20 +327,35 @@ class PoseRecorder:
             
         except Exception as e:
             rospy.logerr("启动姿态还原节点失败: %s", str(e))
+
 def main():
     """主函数"""
+    recorder = None
     try:
         recorder = PoseRecorder()
         recorder.start_recording()
 
-        # 保持节点运行
-        rospy.spin()
+        # 保持节点运行，直到请求退出
+        while not rospy.is_shutdown() and not recorder.exit_requested:
+            rospy.sleep(0.1)
+            
+        # 如果是用户请求退出，确保清理工作完成
+        if recorder.exit_requested:
+            rospy.loginfo("程序正在退出...")
+            sys.exit(0)
 
     except rospy.ROSInterruptException:
-        if 'recorder' in locals() and hasattr(recorder, 'recording') and recorder.recording:
+        rospy.loginfo("ROS节点被中断")
+        if recorder and recorder.recording:
             recorder.stop_recording()
+    except KeyboardInterrupt:
+        rospy.loginfo("程序被用户中断")
+        if recorder and recorder.recording:
+            recorder.stop_recording()
+        sys.exit(0)
     except Exception as e:
         rospy.logerr("姿态记录器发生未预期异常: %s", str(e))
+        sys.exit(1)
 
 
 if __name__ == '__main__':

@@ -12,8 +12,7 @@ import rospy
 import rosbag
 import os
 import sys
-from alicia_duo_driver.msg import ArmJointState
-from std_msgs.msg import Float32
+from sensor_msgs.msg import JointState
 
 
 class PoseReplicator:
@@ -32,16 +31,10 @@ class PoseReplicator:
             script_dir = os.path.dirname(os.path.abspath(__file__))
             self.bag_file_path = os.path.join(script_dir, 'pose_data.bag')
 
-        # 创建发布者，分别用于机械臂关节和夹爪
-        # 使用直接控制话题，不需要MoveIt
+        # 创建发布者，使用实际存在的关节命令话题
         self.joint_pub = rospy.Publisher(
-            '/arm_joint_command', 
-            ArmJointState, 
-            queue_size=10
-        )
-        self.gripper_pub = rospy.Publisher(
-            '/gripper_control', 
-            Float32, 
+            '/joint_commands', 
+            JointState, 
             queue_size=10
         )
 
@@ -55,7 +48,7 @@ class PoseReplicator:
         从bag文件中加载轨迹数据
         
         Returns:
-            tuple: (joint_positions, timestamps) 联合位置数组和对应的时间戳数组
+            tuple: (joint_states, timestamps) 关节状态数组和对应的时间戳数组
                   如果加载失败则返回None
         """
         # 检查文件是否存在
@@ -66,46 +59,41 @@ class PoseReplicator:
         try:
             # 打开bag文件
             bag = rosbag.Bag(self.bag_file_path)
-            topic_name = '/recorded_arm_joint_state'
-            joint_positions = []
+            topic_name = '/recorded_joint_states'
+            joint_states = []
             timestamps = []
 
             # 读取所有消息
             for topic, msg, t in bag.read_messages(topics=[topic_name]):
-                joint_pos = [
-                    msg.joint1, msg.joint2, msg.joint3,
-                    msg.joint4, msg.joint5, msg.joint6,
-                    msg.gripper
-                ]
-                joint_positions.append(joint_pos)
+                joint_states.append(msg)
                 timestamps.append(t.to_sec())
 
             bag.close()
 
             # 检查是否成功读取数据
-            if not joint_positions:
+            if not joint_states:
                 rospy.logwarn("未在主题 %s 中读取到任何轨迹点", topic_name)
                 return None
 
-            rospy.loginfo("成功读取 %d 个轨迹点", len(joint_positions))
-            return joint_positions, timestamps
+            rospy.loginfo("成功读取 %d 个轨迹点", len(joint_states))
+            return joint_states, timestamps
 
         except Exception as e:
             rospy.logerr("读取轨迹数据失败: %s", str(e))
             return None
 
-    def send_trajectory_directly(self, joint_positions, timestamps):
+    def send_trajectory_directly(self, joint_states, timestamps):
         """
         直接发送关节命令
         
         Args:
-            joint_positions: 关节位置数组列表
+            joint_states: JointState消息列表
             timestamps: 时间戳列表
             
         Returns:
             bool: 是否成功发送轨迹
         """
-        if not joint_positions or not timestamps:
+        if not joint_states or not timestamps:
             rospy.logerr("轨迹数据无效")
             return False
 
@@ -129,7 +117,7 @@ class PoseReplicator:
                 # 检查是否完成
                 if elapsed > total_time:
                     # 发送最后一个点
-                    self._send_joint_command(joint_positions[-1])
+                    self._send_joint_command(joint_states[-1])
                     break
                 
                 # 计算当前应该执行的索引
@@ -141,7 +129,7 @@ class PoseReplicator:
                 for i in range(last_index, len(timestamps)):
                     if timestamps[i] >= target_time:
                         # 发送这个点的命令
-                        self._send_joint_command(joint_positions[i])
+                        self._send_joint_command(joint_states[i])
                         last_index = i
                         break
                     
@@ -155,27 +143,22 @@ class PoseReplicator:
             rospy.logerr("发送轨迹失败: %s", str(e))
             return False
     
-    def _send_joint_command(self, joint_pos):
+    def _send_joint_command(self, joint_state_msg):
         """
-        发送单个关节位置命令
+        发送单个关节状态命令
         
         Args:
-            joint_pos: 包含7个关节角度的列表
+            joint_state_msg: JointState消息
         """
-        # 创建并发送机械臂命令
-        arm_msg = ArmJointState()
-        arm_msg.joint1 = joint_pos[0]
-        arm_msg.joint2 = joint_pos[1]
-        arm_msg.joint3 = joint_pos[2]
-        arm_msg.joint4 = joint_pos[3]
-        arm_msg.joint5 = joint_pos[4]
-        arm_msg.joint6 = joint_pos[5]
-        self.joint_pub.publish(arm_msg)
+        # 创建新的JointState消息用于命令
+        cmd_msg = JointState()
+        cmd_msg.header.stamp = rospy.Time.now()
+        cmd_msg.name = joint_state_msg.name
+        cmd_msg.position = joint_state_msg.position
+        cmd_msg.velocity = joint_state_msg.velocity if joint_state_msg.velocity else []
+        cmd_msg.effort = joint_state_msg.effort if joint_state_msg.effort else []
         
-        # 创建并发送夹爪命令
-        gripper_msg = Float32()
-        gripper_msg.data = joint_pos[6]
-        self.gripper_pub.publish(gripper_msg)
+        self.joint_pub.publish(cmd_msg)
 
     def run(self):
         """
@@ -190,7 +173,7 @@ class PoseReplicator:
             rospy.logerr("无法加载轨迹数据，退出")
             return False
 
-        joint_positions, timestamps = data
+        joint_states, timestamps = data
 
         # 提示用户开始执行
         rospy.loginfo("按 Enter 键开始执行轨迹...")
@@ -200,7 +183,7 @@ class PoseReplicator:
             raw_input()  # Python 2 兼容
 
         # 发送轨迹
-        return self.send_trajectory_directly(joint_positions, timestamps)
+        return self.send_trajectory_directly(joint_states, timestamps)
 
 
 def main():
@@ -210,16 +193,20 @@ def main():
         success = replicator.run()
         
         if success:
-            rospy.loginfo("轨迹执行完成")
+            sys.exit(0)
         else:
             rospy.logerr("轨迹执行失败")
+            sys.exit(1)
             
     except rospy.ROSInterruptException:
         rospy.loginfo("ROS节点被中断")
+        sys.exit(0)
     except KeyboardInterrupt:
         rospy.loginfo("操作被用户取消")
+        sys.exit(0)
     except Exception as e:
         rospy.logerr("姿态复制器发生未预期异常: %s", str(e))
+        sys.exit(1)
 
 
 if __name__ == '__main__':
