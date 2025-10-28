@@ -1,5 +1,5 @@
 controller_list:
-  - name: alicia_controller
+  - name: Alicia_controller
     action_ns: follow_joint_trajectory
     type: FollowJointTrajectory
     default: True
@@ -10,7 +10,7 @@ controller_list:
       - Joint4
       - Joint5
       - Joint6
-  - name: hand_controller
+  - name: Gripper_controller
     action_ns: follow_joint_trajectory
     type: FollowJointTrajectory
     default: True

@@ -1,11 +1,11 @@
 moveit_setup_assistant_config:
   URDF:
     package: alicia_d_descriptions
-    relative_path: urdf/alicia_duo_with_gripper.urdf
+    relative_path: urdf/Alicia_D_v5_6/Alicia_D_gripper_100mm.urdf
     xacro_args: ""
   SRDF:
-    relative_path: config/alicia_d_descriptions.srdf
+    relative_path: config/Alicia_D_v5_6_gripper_100mm.srdf
   CONFIG:
-    author_name: d
-    author_email: d@qq.com
-    generated_timestamp: 1754390132
+    author_name: s
+    author_email: s@qq.com
+    generated_timestamp: 1761564126

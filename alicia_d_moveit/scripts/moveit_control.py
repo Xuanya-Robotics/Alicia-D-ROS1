@@ -13,7 +13,7 @@ from sensor_msgs.msg import JointState
 class MoveItRobotController:
 
 
-    def __init__(self, manipulator_group="alicia", gripper_group="hand", velocity=1.0):
+    def __init__(self, manipulator_group="Alicia", gripper_group="Gripper", velocity=1.0):
         # Initialize MoveIt
         moveit_commander.roscpp_initialize(sys.argv)
         if not rospy.get_node_uri():

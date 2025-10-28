@@ -6,6 +6,6 @@
 
   <!-- Load the controllers -->
   <node name="controller_spawner" pkg="controller_manager" type="spawner" respawn="false"
-    output="screen" args="alicia_controller hand_controller "/>
+    output="screen" args="Alicia_controller Gripper_controller "/>
 
 </launch>

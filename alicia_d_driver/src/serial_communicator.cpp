@@ -4,6 +4,7 @@
 #include <numeric>
 #include <iomanip>
 #include <sstream>
+#include <algorithm>
 #include <ros/ros.h>
 
 SerialCommunicator::SerialCommunicator(std::string port_name, uint32_t baud_rate, bool debug_mode)
@@ -86,12 +87,14 @@ bool SerialCommunicator::write_raw_frame(const std::vector<uint8_t>& frame)
         ROS_WARN("Write raw frame failed: port is not open.");
         return false;
     }
-    static int s_write_sleep_ms = 6;
+    static int s_write_sleep_ms = 30;
+    // static int s_write_sleep_ms = 6;
     std::lock_guard<std::mutex> lock(serial_mutex_);
     try {
         if (debug_mode_) {
            print_hex_frame("Sending Raw Frame: ", frame);
         }
+        // debug for data writing
         size_t bytes_written = serial_port_.write(frame);
         std::this_thread::sleep_for(std::chrono::milliseconds(s_write_sleep_ms));
 
@@ -100,33 +103,7 @@ bool SerialCommunicator::write_raw_frame(const std::vector<uint8_t>& frame)
              return false; // Indicate failure
         }
 
-        // Measure serial write call rate and throughput (logs once per second)
-        // {
-        //     static bool s_initialized = false;
-        //     static bool s_log_rates = true;
-        //     static size_t s_write_calls = 0;
-        //     static size_t s_bytes_total = 0;
-        //     static ros::Time s_last_log(0, 0);
-        //     if (!s_initialized) {
-        //         ros::param::param("~log_rates", s_log_rates, true);
-        //         s_last_log = ros::Time::now();
-        //         s_initialized = true;
-        //     }
-        //     ++s_write_calls;
-        //     s_bytes_total += bytes_written;
-        //     const ros::Time now = ros::Time::now();
-        //     const double dt = (now - s_last_log).toSec();
-        //     if (s_log_rates && dt >= 1.0) {
-        //         const double hz = static_cast<double>(s_write_calls) / dt;
-        //         const double bytes_per_sec = static_cast<double>(s_bytes_total) / dt;
-        //         const double kbps = (bytes_per_sec * 8.0) / 1000.0; // approximate
-        //         ROS_INFO("[Rate] serial writes: %.1f Hz, throughput: %.1f B/s (~%.1f kbps) (window %.2fs, %zu writes)",
-        //                  hz, bytes_per_sec, kbps, dt, s_write_calls);
-        //         s_write_calls = 0;
-        //         s_bytes_total = 0;
-        //         s_last_log = now;
-        //     }
-        // }
+
     } catch (const std::exception& e) {
         ROS_ERROR("Exception while writing raw frame to serial port %s: %s", port_name_.c_str(), e.what());
         disconnect(); // Disconnect on write error
@@ -163,32 +140,57 @@ void SerialCommunicator::read_thread_loop()
             }
             else {
                 frame_buffer.push_back(byte_buffer);
+                
+                // Safety check: clear buffer if too large (corrupted frame)
+                if (frame_buffer.size() > MAX_FRAME_LENGTH) {
+                    print_hex_frame("Recv OVERFLOW/CORRUPT: ", frame_buffer);
+                    frame_buffer.clear();
+                    wait_for_start = true;
+                    continue;
+                }
+                
                 if (frame_buffer.size() >= 5) {
                     if (byte_buffer == FRAME_END_BYTE) {
                         uint8_t payload_len = frame_buffer[2];
+                        
+                        // Validate payload_len to prevent crashes from corrupted data
+                        if (payload_len > 100) {
+                            if (debug_mode_) {
+                                ROS_WARN("Abnormal payload_len=%d, resyncing", payload_len);
+                            }
+                            frame_buffer.erase(frame_buffer.begin());
+                            continue;
+                        }
+                        
                         size_t expected_total_len = static_cast<size_t>(payload_len) + 5;
 
-                        if (frame_buffer.size() == expected_total_len) {
-                            if (validate_checksum(frame_buffer, payload_len)) {
+                        if (frame_buffer.size() >= expected_total_len) {
+                            // Extract the first complete frame
+                            std::vector<uint8_t> first_frame(frame_buffer.begin(), frame_buffer.begin() + expected_total_len);
+                            
+                            if (validate_checksum(first_frame, payload_len)) {
+                                // Valid frame - queue it
                                 std::lock_guard<std::mutex> lock(queue_mutex_);
-
-                                received_packets_queue_.push_back(std::vector<uint8_t>(frame_buffer.begin() + 1, frame_buffer.end() - 2));
-
-                            } else {
-                                print_hex_frame("Received Invalid Frame (Bad Checksum): ", frame_buffer);
+                                received_packets_queue_.push_back(std::vector<uint8_t>(first_frame.begin() + 1, first_frame.end() - 2));
                             }
-                            wait_for_start = true; // Reset for the next frame
-                        } else if (frame_buffer.size() > expected_total_len) {
-                            print_hex_frame("Received Invalid Frame (Length Mismatch): ", frame_buffer);
-                            wait_for_start = true; // Reset for the next frame
+                            
+                            // Remove the processed frame from buffer
+                            frame_buffer.erase(frame_buffer.begin(), frame_buffer.begin() + expected_total_len);
+                            
+                            // Look for the next frame start (0xAA) in remaining bytes
+                            auto next_start = std::find(frame_buffer.begin(), frame_buffer.end(), FRAME_START_BYTE);
+                            if (next_start != frame_buffer.end()) {
+                                // Found next frame - remove bytes before it
+                                frame_buffer.erase(frame_buffer.begin(), next_start);
+                                // Continue processing at frame start
+                                continue;
+                            } else {
+                                // No more frame starts found - clear buffer
+                                frame_buffer.clear();
+                                wait_for_start = true;
+                            }
                         }
-                        // wait_for_start = true; 
                     }
-                }
-                // Safety break for corrupted frames
-                if (frame_buffer.size() >= MAX_FRAME_LENGTH) {
-                    print_hex_frame("Recv OVERFLOW/CORRUPT: ", frame_buffer);
-                    wait_for_start = true;
                 }
             }
         } catch (const serial::IOException& e) {

@@ -10,7 +10,7 @@ joint_state_controller:
     - Joint6
     - right_finger
     
-alicia_controller:
+Alicia_controller:
   type: position_controllers/JointTrajectoryController
   joints:
     - Joint1
@@ -20,7 +20,7 @@ alicia_controller:
     - Joint5
     - Joint6
 
-hand_controller:
+Gripper_controller:
   type: position_controllers/JointTrajectoryController
   joints:
     - right_finger

@@ -1,0 +1,3 @@
+[submodule "alicia_d_descriptions/Synria-Robot-Descriptions"]
+	path = alicia_d_descriptions/Synria-Robot-Descriptions
+	url = https://github.com/Synria-Robotics/Synria-Robot-Descriptions.git

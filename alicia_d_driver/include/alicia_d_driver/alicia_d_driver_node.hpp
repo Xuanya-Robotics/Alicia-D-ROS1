@@ -48,14 +48,28 @@ private:
    void parse_servo_states_frame(const std::vector<uint8_t>& payload);
    void parse_gripper_state_frame(const std::vector<uint8_t>& payload); // Add this
    void parse_error_frame(const std::vector<uint8_t>& payload);
+   void parse_version_frame(const std::vector<uint8_t>& payload);
+   void load_robot_description_params();
+   
+   // Firmware version detection
+   void send_firmware_query();
+   void detect_firmware_version();
+   
+   // Speed and acceleration control (V6+ firmware)
+   void set_speed(double speed_rad_s);
+   void set_acceleration();
 
     // Data Conversion & Framing
    uint16_t rad_to_hardware_value(double angle_rad);
-   uint16_t rad_to_hardware_value_grip(double angle_rad);
+   uint16_t rad_to_hardware_value_grip(double angle_rad);  // Legacy - kept for compatibility
+   uint16_t value_to_hardware_value_grip(double gripper_value);  // New: 0..100 -> hardware
    double hardware_value_to_rad(uint16_t hw_value);
    double hardware_value_to_rad_grip(uint16_t hw_value);
    std::vector<uint8_t> generate_simple_frame(uint8_t command, uint8_t data, bool use_checksum);
    uint8_t calculate_checksum(const std::vector<uint8_t>& frame_data);
+   
+   // Firmware version specific helpers
+   uint8_t get_gripper_frame_size();
 
     // Member Variables
    std::unique_ptr<SerialCommunicator> communicator_;
@@ -76,6 +90,15 @@ private:
    double rate_limit_sec_;
    double command_rate_hz_;
    ros::Time last_process_time_;
+   std::string firmware_version_;  // e.g., "5.0.0" or "6.0.0" or "auto"
+   bool firmware_new_;  // true for v6.x+, false for v5.x
+   std::string gripper_type_;  // e.g., "50mm" or "100mm"
+   double gripper_hw_max_;  // Max hardware value based on gripper type
+   bool firmware_version_detected_;  // Track if version has been detected
+   ros::Time firmware_query_time_;  // Time when firmware query was sent
+   
+   // Speed control parameters (for V6 firmware)
+   double default_speed_rad_s_;  // Default speed in rad/s
     // Trajectory smoothing parameters
     bool use_trajectory_smoothing_ = true;
     double max_joint_velocity_rad_s_ = 2.5;     // per-joint max command slew rate (rad/s)
@@ -104,7 +127,7 @@ private:
 
    // Latest command (decoupled from ROS subscriber thread)
    std::vector<double> latest_joint_angles_; // size 6
-   double latest_gripper_rad_ = 0.0;          // radians
+   double latest_gripper_rad_ = 0.0;          // Actually stores 0..100 value
    bool has_latest_command_ = false;
    ros::Time last_command_sent_time_;
 
@@ -117,8 +140,16 @@ private:
     // Interpolated command state (what we actually stream to hardware)
     std::vector<double> cmd_joint_angles_;      // size 6, radians
     std::vector<double> cmd_joint_velocities_;  // size 6, rad/s
-    double cmd_gripper_rad_ = 0.0;              // radians
-    double cmd_gripper_vel_rad_s_ = 0.0;        // rad/s
+    double cmd_gripper_rad_ = 0.0;              // Actually stores 0..100 value
+    double cmd_gripper_vel_rad_s_ = 0.0;        // Actually stores 0..100/s
+
+    // Track last values sent to hardware to avoid unnecessary transmissions
+    std::vector<double> last_hw_sent_joint_angles_;
+    double last_hw_sent_gripper_value_;
+    
+    // Minimum changes to trigger hardware update
+    double min_joint_change_for_hw_ = 0.01;  // 0.01 rad
+    double min_gripper_change_for_hw_ = 1.0;  // 1% for gripper (0..100 range)
 
     // Timestamp of the last feedback received from hardware. When stale, we
     // fall back to publishing the commanded state so visualizers remain in sync.

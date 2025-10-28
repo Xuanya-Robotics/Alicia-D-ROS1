@@ -1,15 +1,29 @@
 <launch>
+  <!-- Robot version argument -->
+  <arg name="robot_version" default="v5_6" doc="Robot version: v5_5 or v5_6" />
+  
+  <!-- Gripper type argument -->
+  <arg name="gripper_type" default="100mm" doc="Gripper type: 50mm or 100mm" />
+
   <!-- By default we do not overwrite the URDF. Change the following to true to change the default behavior -->
   <arg name="load_robot_description" default="false"/>
+  <!-- Control whether to load SRDF from file -->
+  <arg name="load_robot_semantic" default="true"/>
 
   <!-- The name of the parameter under which the URDF is loaded -->
   <arg name="robot_description" default="robot_description"/>
 
+  <!-- URDF file path -->
+  <arg name="urdf_file" default="$(find alicia_d_descriptions)/urdf/Alicia_D_$(arg robot_version)/Alicia_D_gripper_$(arg gripper_type).urdf" />
+  
+  <!-- SRDF file path -->
+  <arg name="srdf_file" default="$(find alicia_d_moveit)/config/Alicia_D_$(arg robot_version)_gripper_$(arg gripper_type).srdf" />
+
   <!-- Load universal robot description format (URDF) -->
-  <param if="$(arg load_robot_description)" name="$(arg robot_description)" textfile="$(find alicia_d_descriptions)/urdf/alicia_duo_with_gripper.urdf"/>
+  <param if="$(arg load_robot_description)" name="$(arg robot_description)" textfile="$(arg urdf_file)"/>
 
   <!-- The semantic description that corresponds to the URDF -->
-  <param name="$(arg robot_description)_semantic" textfile="$(find alicia_d_moveit)/config/alicia_d_descriptions.srdf" />
+  <param if="$(arg load_robot_semantic)" name="$(arg robot_description)_semantic" textfile="$(arg srdf_file)" />
 
   <!-- Load updated joint limits (override information from URDF) -->
   <group ns="$(arg robot_description)_planning">

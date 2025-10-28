@@ -22,6 +22,16 @@ bool AliciaDHardwareInterface::init()
     joint_positions_.resize(num_joints_, 0.0);
     joint_position_commands_.resize(num_joints_, 0.0);
     raw_joint_positions_.resize(num_joints_, 0.0);
+    last_sent_positions_.resize(num_joints_, 0.0);
+    
+    // Initialize change detection thresholds
+    // Get parameters with reasonable defaults
+    nh_.param<double>("min_joint_change_threshold", min_joint_change_threshold_, 0.01); // 0.01 rad ≈ 0.5 degrees
+    nh_.param<double>("min_gripper_change_threshold", min_gripper_change_threshold_, 0.001); // 0.001 m = 1 mm
+    
+    ROS_INFO("Change detection thresholds: joint=%.4f rad (%.1f deg), gripper=%.4f m (%.1f mm)",
+             min_joint_change_threshold_, min_joint_change_threshold_ * 180.0 / M_PI,
+             min_gripper_change_threshold_, min_gripper_change_threshold_ * 1000.0);
 
     // Create a map for efficient name-to-index lookup
     for (size_t i = 0; i < num_joints_; ++i)
@@ -87,13 +97,37 @@ void AliciaDHardwareInterface::read(const ros::Time& time, const ros::Duration& 
 
 void AliciaDHardwareInterface::write(const ros::Time& time, const ros::Duration& period)
 {
-    sensor_msgs::JointState command_msg;
-    command_msg.header.stamp = ros::Time::now();
-    command_msg.name = joint_names_;
-    command_msg.position = joint_position_commands_;
+    // Check if any joint has changed significantly
+    bool needs_update = false;
+    for (size_t i = 0; i < num_joints_; ++i)
+    {
+        double change = std::abs(joint_position_commands_[i] - last_sent_positions_[i]);
+        
+        // For gripper (usually the last joint), use gripper threshold
+        // For arm joints, use joint threshold
+        double threshold = (i == num_joints_ - 1) ? min_gripper_change_threshold_ : min_joint_change_threshold_;
+        
+        if (change > threshold)
+        {
+            needs_update = true;
+            break; // At least one joint needs update, so we'll send the full message
+        }
+    }
+    
+    // Only publish if there are significant changes
+    if (needs_update)
+    {
+        sensor_msgs::JointState command_msg;
+        command_msg.header.stamp = ros::Time::now();
+        command_msg.name = joint_names_;
+        command_msg.position = joint_position_commands_;
 
-    // Publish the joint command message
-    joint_command_pub_.publish(command_msg);
+        // Publish the joint command message
+        joint_command_pub_.publish(command_msg);
+        
+        // Update last sent positions
+        last_sent_positions_ = joint_position_commands_;
+    }
 }
 
 }

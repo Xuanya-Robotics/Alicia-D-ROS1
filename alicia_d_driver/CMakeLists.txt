@@ -25,8 +25,6 @@ find_package(catkin REQUIRED COMPONENTS
 # This is for other ROS packages that might depend on this one in the future.
 catkin_package(
   INCLUDE_DIRS include
-#   LIBRARIES bessica_d_hw_interface # Export the library for other packages to use
-  # DEPENDS is no longer needed here as catkin handles dependencies from find_package
   CATKIN_DEPENDS roscpp std_msgs sensor_msgs hardware_interface controller_manager serial
 )
 

@@ -42,12 +42,18 @@ private:
     std::vector<double> joint_velocities_;
     std::vector<double> joint_efforts_;
     std::vector<double> joint_position_commands_;
-    std::vector<double> last_commanded_positions_;
+    
+    // Track last sent positions to avoid unnecessary publishes
+    std::vector<double> last_sent_positions_;
 
     // This vector stores the data from the callback for thread-safe access
     std::vector<double> raw_joint_positions_;
     std::mutex command_mutex_;
     bool is_initialized_ = false;
+    
+    // Minimum change thresholds (in radians for joints, meters for gripper)
+    double min_joint_change_threshold_;
+    double min_gripper_change_threshold_;
 
 };
 

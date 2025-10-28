@@ -3,10 +3,10 @@
   <name>alicia_d_moveit</name>
   <version>0.3.0</version>
   <description>
-     An automatically generated package with all the configuration and launch files for using the alicia_D_v5_4 with the MoveIt Motion Planning Framework
+     An automatically generated package with all the configuration and launch files for using the Alicia_D_v5_6_gripper_100mm with the MoveIt Motion Planning Framework
   </description>
-  <author email="d@qq.com">d</author>
-  <maintainer email="d@qq.com">d</maintainer>
+  <author email="s@qq.com">s</author>
+  <maintainer email="s@qq.com">s</maintainer>
 
   <license>BSD</license>
 

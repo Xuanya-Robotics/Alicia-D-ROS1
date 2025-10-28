@@ -1,5 +1,5 @@
-stomp/alicia:
-  group_name: alicia
+stomp/Alicia:
+  group_name: Alicia
   optimization:
     num_timesteps: 60
     num_iterations: 40
@@ -37,8 +37,8 @@ stomp/alicia:
         publish_intermediate: True
         marker_topic: stomp_trajectory
         marker_namespace: optimized
-stomp/hand:
-  group_name: hand
+stomp/Gripper:
+  group_name: Gripper
   optimization:
     num_timesteps: 60
     num_iterations: 40
