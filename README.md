@@ -20,7 +20,7 @@ Run the install script (it installs required dependencies and builds the workspa
 ```bash
 mkdir -p alicia_ws/src
 cd alicia_ws
-git clone https://github.com/Synria-Robotics/Alicia-D-ROS1.git -b v5.5.0 ./src/
+git clone https://github.com/Synria-Robotics/Alicia-D-ROS1.git -b v6.0.0 ./src/
 ./src/install/alicia_amd64_install.sh
 ```
 
@@ -71,7 +71,7 @@ roslaunch alicia_d_driver alicia_d_driver.launch
 Default serial port and baudrate is /dev/ttyUSB0 and 1000000 separately.
 For custom usage, running like the following:
 ```
-roslaunch alicia_d_driver alicia_d_driver.launch port:=/dev/ttyCH341USB0 baud_rate:=1000000
+roslaunch alicia_d_driver alicia_d_driver.launch port:=/dev/ttyCH341USB0 gripper_type:=100mm 
 ```
 
 Verify:
@@ -104,7 +104,7 @@ effort: []
 - Start the Alicia-D driver with MoveIt:
 
 ```bash
-roslaunch alicia_d_driver alicia_d_bringup.launch
+roslaunch alicia_d_driver alicia_d_bringup.launch gripper_type:=100mm 
 ```
 
 Example of customized usage:

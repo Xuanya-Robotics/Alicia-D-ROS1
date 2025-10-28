@@ -20,7 +20,7 @@ Alicia-D 系列机械臂为远程操作数据采集以及复现前沿机器人�
 ```bash
 mkdir -p alicia_ws/src
 cd alicia_ws
-git clone https://github.com/Synria-Robotics/Alicia-D-ROS1.git -b v5.5.0 ./src/
+git clone https://github.com/Synria-Robotics/Alicia-D-ROS1.git -b v6.0.0 ./src/
 ./src/install/alicia_amd64_install.sh
 ```
 
@@ -66,13 +66,10 @@ ls -l /dev/ttyUSB*
 - 仅启动 Alicia-D 驱动：
 
 ```bash
-roslaunch alicia_d_driver alicia_d_driver.launch
+roslaunch alicia_d_driver alicia_d_driver.launch port:=/dev/ttyUSB0 gripper_type:=100mm
 ```
 
-自定义串口端口和分辨率
-```
-roslaunch alicia_d_driver alicia_d_driver.launch port:=/dev/ttyCH341USB0 baud_rate:=1000000
-```
+
 关节验证：
 ```bash
 rostopic echo /joint_states
@@ -83,7 +80,7 @@ rostopic echo /joint_states
 - 启动 Alicia-D 驱动并加载 MoveIt：
 
 ```
-roslaunch alicia_d_driver alicia_d_bringup.launch
+roslaunch alicia_d_driver alicia_d_bringup.launch port:=/dev/ttyUSB0 gripper_type:=100mm
 ```
 
 - USB 相机标定

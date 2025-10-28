@@ -6,7 +6,7 @@
   -->
   <!-- Choose MoveIt controller manager: fake | simple | ros_control -->
   <arg name="moveit_controller_manager" default="ros_control"/>
-  <arg name="port" default="/dev/ttyCH343USB0" />
+  <arg name="port" default="/dev/ttyUSB0" />
   <arg name="baudrate" default="1000000" />
   <arg name="firmware_version" default="auto" />
   <!-- Robot version: v5_5 or v5_6. Default v5_6 supports both 50mm and 100mm grippers -->
