@@ -288,7 +288,9 @@ class CubeSorting:
 
     def _load_handeye_transform(self):
         """Load T_cam_tool0 from yaml. Returns 4x4 np.array or None."""
-        yaml_path = os.path.join(os.path.dirname(__file__), 'usb_handeyecalibration_eye_on_hand.yaml')
+        yaml_path = "/home/xuanya/.ros/easy_handeye/usb_handeyecalibration_eye_on_hand.yaml"
+        if not os.path.exists(yaml_path):
+            yaml_path = os.path.join(os.path.dirname(__file__), 'usb_handeyecalibration_eye_on_hand.yaml')
         if not os.path.exists(yaml_path):
             return None
         import yaml

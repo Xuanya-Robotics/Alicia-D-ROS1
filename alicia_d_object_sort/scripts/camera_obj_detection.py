@@ -101,7 +101,10 @@ class TransformHelper:
                     self.ros_ok = False
 
     def _load_handeye_transform(self):
-        yaml_path = os.path.join(os.path.dirname(__file__), "usb_handeyecalibration_eye_on_hand.yaml")
+        # Try user-specified path first, then fallback to script directory
+        yaml_path = "/home/xuanya/.ros/easy_handeye/usb_handeyecalibration_eye_on_hand.yaml"
+        if not os.path.exists(yaml_path):
+            yaml_path = os.path.join(os.path.dirname(__file__), "usb_handeyecalibration_eye_on_hand.yaml")
         if not os.path.exists(yaml_path):
             self.T_cam_tool0 = None
             return
@@ -249,7 +252,10 @@ def open_camera_with_transforms_dual_mode(camera_index=0, width=None, height=Non
 
         # Intrinsics once (scaled to stream size)
         if camera_matrix is None:
-            yaml_path = os.path.join(os.path.dirname(__file__), "head_camera.yaml")
+            # Try user-specified path first, then fallback to script directory
+            yaml_path = "/home/xuanya/.ros/camera_info/head_camera.yaml"
+            if not os.path.exists(yaml_path):
+                yaml_path = os.path.join(os.path.dirname(__file__), "head_camera.yaml")
             H, W = processed_frame.shape[:2]
             if os.path.exists(yaml_path):
                 K, dist = load_intrinsics_from_yaml(yaml_path, (H, W, 3))
@@ -622,5 +628,4 @@ def detect_cubes_on_frame(frame):
 if __name__ == "__main__":
     # Set width/height to your stream; if using Orbbec RGB, 1280x720 is typical.
     open_camera_with_transforms_dual_mode(0, width=1280, height=720, enable_ros_tf=True)
-
 
