@@ -4,12 +4,6 @@
     <arg name="marker_size" doc="Size of the ArUco marker used, in meters" default="0.1"/>
     <arg name="marker_id" doc="The ID of the ArUco marker used" default="100"/>
 
-    <!-- ============================================================== -->
-    <!-- ==                 启动机械臂的moveit控制                    == -->
-    <!-- ============================================================== -->
-
-    <include file="$(find alicia_d_driver)/launch/alicia_d_bringup.launch">
-    </include>
 
     <!-- ============================================================== -->
     <!-- ==                 启动 Orbbec Camera                     == -->
