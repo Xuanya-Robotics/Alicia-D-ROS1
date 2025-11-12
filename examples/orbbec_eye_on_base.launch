@@ -36,18 +36,24 @@
     <!-- ============================================================== -->
     <include file="$(find easy_handeye)/launch/calibrate.launch" >
         <arg name="namespace_prefix" value="$(arg namespace_prefix)" />
-        <arg name="eye_on_hand" value="false" /> <!-- Eye-on-Base 配置 -->
+        <arg name="eye_on_hand" value="true" /> <!-- 确认是 Eye-in-Hand -->
 
         <!-- 相机基础坐标系 (TF由此发布) -->
         <arg name="tracking_base_frame" value="camera_link" />
-        <!-- 检测到的标记坐标系 (由 ArUco 发布) -->
+
+        <!-- 检测到的标记坐标系 (由 ArUco 发布，相对于 tracking_base_frame) -->
         <arg name="tracking_marker_frame" value="camera_marker" />
+
         <!-- 机器人基坐标系 -->
         <arg name="robot_base_frame" value="base_link" />
-        <!-- **标记附着**在哪个连杆上 -->
-        <arg name="robot_effector_frame" value="tool0" /> 
-        <!-- tcp_link or Link06 -->
+        <!-- **标记附着**在哪个连杆上 (非常重要!) -->
+        <arg name="robot_effector_frame" value="tool0" />
 
+        <!-- MoveIt配置 -->
+        <arg name="move_group" value="Alicia" />
+        <arg name="move_group_namespace" value="/" />
+
+        <!-- 机器人运动参数 -->
         <arg name="freehand_robot_movement" value="false" />
         <arg name="robot_velocity_scaling" value="0.5" />
         <arg name="robot_acceleration_scaling" value="0.2" />
