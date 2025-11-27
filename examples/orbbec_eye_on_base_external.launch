@@ -1,0 +1,45 @@
+<launch>
+    <!-- =============================================================== -->
+    <!-- 参数 -->
+    <!-- =============================================================== -->
+    <arg name="namespace_prefix" default="orbbec_eye_on_base" />
+    <arg name="marker_size" doc="ArUco 标记尺寸(m)" default="0.1" />
+    <arg name="marker_id" doc="ArUco 标记 ID" default="100" />
+
+    <!-- =============================================================== -->
+    <!-- 奥比中光 Gemini 相机 (固定在外部) -->
+    <!-- =============================================================== -->
+    <include file="$(find orbbec_camera)/launch/gemini.launch" />
+
+    <!-- =============================================================== -->
+    <!-- ArUco 检测：相机固定，标记在末端执行器 -->
+    <!-- =============================================================== -->
+    <node name="aruco_tracker" pkg="aruco_ros" type="single" output="screen">
+        <remap from="/camera_info" to="/camera/color/camera_info" />
+        <remap from="/image" to="/camera/color/image_raw" />
+        <param name="image_is_rectified" value="true" />
+        <param name="marker_size" value="$(arg marker_size)" />
+        <param name="marker_id" value="$(arg marker_id)" />
+        <param name="reference_frame" value="camera_link" />
+        <param name="camera_frame" value="camera_link" />
+        <param name="marker_frame" value="camera_marker" />
+    </node>
+
+    <!-- =============================================================== -->
+    <!-- easy_handeye：Eye-on-Base (相机固定) -->
+    <!-- =============================================================== -->
+    <include file="$(find easy_handeye)/launch/calibrate.launch">
+        <arg name="namespace_prefix" value="$(arg namespace_prefix)" />
+        <arg name="eye_on_hand" value="false" />
+        <arg name="tracking_base_frame" value="camera_link" />
+        <arg name="tracking_marker_frame" value="camera_marker" />
+        <arg name="robot_base_frame" value="base_link" />
+        <arg name="robot_effector_frame" value="tool0" />
+        <arg name="move_group" value="Alicia" />
+        <arg name="move_group_namespace" value="/" />
+        <arg name="freehand_robot_movement" value="false" />
+        <arg name="robot_velocity_scaling" value="0.3" />
+        <arg name="robot_acceleration_scaling" value="0.15" />
+    </include>
+</launch>
+
