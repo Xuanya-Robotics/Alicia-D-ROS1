@@ -62,9 +62,6 @@
   <!-- Start the ros_control hardware interface node -->
   <node name="alicia_d_hw_interface" pkg="alicia_d_driver" type="alicia_d_hw_interface_node" output="screen"/>
 
-  <!-- Wait for robot_description to be published by the driver -->
-  <node name="wait_for_robot_description" pkg="alicia_d_driver" type="wait_for_robot_description.py" output="screen"/>
-
   <!-- Load the robot state publisher. Waits for robot_description via launch-prefix delay -->
   <node name="robot_state_publisher" pkg="robot_state_publisher" type="robot_state_publisher" output="screen" launch-prefix="bash -c 'sleep 2; $0 $@' "/>
 
