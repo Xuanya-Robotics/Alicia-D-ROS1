@@ -1,8 +1,8 @@
 cmake_minimum_required(VERSION 3.0.2)
 project(alicia_d_driver)
 
-# Set the C++ standard to C++14. This is good practice for modern ROS.
-set(CMAKE_CXX_STANDARD 14)
+# Set the C++ standard to C++17 to support std::optional and other modern features.
+set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # --- Find Dependencies ---
@@ -13,12 +13,12 @@ find_package(catkin REQUIRED COMPONENTS
   sensor_msgs
   hardware_interface
   controller_manager
-  serial  # <-- ADD THIS to find the ros-serial package
 )
 
-# REMOVED: The PkgConfig method for finding the system library LibSerial
-# find_package(PkgConfig REQUIRED)
-# pkg_check_modules(SERIAL REQUIRED libserial)
+# LibSerial and zlib are used by the new serial_communicator and parser, like in ROS2 driver
+find_package(PkgConfig REQUIRED)
+pkg_check_modules(SERIAL REQUIRED libserial)
+find_package(ZLIB REQUIRED)
 
 
 # --- Catkin Package Information ---
@@ -30,20 +30,26 @@ catkin_package(
 
 # --- Include Directories ---
 # Specify all locations of header files.
-# catkin_INCLUDE_DIRS will now automatically include the headers for the 'serial' package
 include_directories(
   include
   ${catkin_INCLUDE_DIRS}
+  ${SERIAL_INCLUDE_DIRS}
 )
 
 
 # --- Build Targets ---
 
 # 1. Hardware Driver Node (communicates with serial port)
-add_executable(alicia_d_driver_node src/alicia_d_driver_node.cpp src/serial_communicator.cpp)
-# Link against catkin libraries, which now includes the 'serial' library
+add_executable(alicia_d_driver_node
+  src/alicia_d_driver_node.cpp
+  src/serial_communicator.cpp
+  src/alicia_d_data_parser_control.cpp
+)
+# Link against catkin libraries and LibSerial/ZLIB (for CRC and serial handling)
 target_link_libraries(alicia_d_driver_node
   ${catkin_LIBRARIES}
+  ${SERIAL_LIBRARIES}
+  ZLIB::ZLIB
 )
 
 # 2. ros_control Interface Library (the bridge)

@@ -1,4 +1,0 @@
-<launch>
-  <rosparam command="load" file="$(find alicia_d_moveit)/config/sensors_3d.yaml"/>
-</launch>
-

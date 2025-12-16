@@ -8,6 +8,7 @@ sudo apt -y autoremove
 # 安装依赖
 sudo apt -y install python3-serial
 sudo apt install python3-opencv
+sudo apt-get install libserial-dev
 sudo apt-get install ros-$ROS_DISTRO-usb-cam
 sudo apt-get install ros-$ROS_DISTRO-camera-calibration
 sudo apt-get install ros-$ROS_DISTRO-aruco-detect
@@ -26,7 +27,7 @@ if [ ! -d "$ALICIA_WS/src" ]; then
   echo "Installing Alicia D ROS packages..."
   mkdir -p "$ALICIA_WS/src"
   cd "$ALICIA_WS/src"
-  git clone https://github.com/Synria-Robotics/Alicia-D-ROS1.git -b v5.5.0 ./src/
+  git clone https://github.com/Synria-Robotics/Alicia-D-ROS1.git -b v6.1.0 ./src/
   cd "$ALICIA_WS"
 
 

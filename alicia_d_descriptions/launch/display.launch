@@ -1,7 +1,6 @@
 <?xml version="1.0"?>
 <launch>
   <!-- Robot version argument -->
-  <arg name="robot_version" default="v5_6" doc="Robot version: v5_5 or v5_6" />
   
   <!-- Gripper type argument -->
   <arg name="gripper_type" default="50mm" doc="Gripper type: 50mm or 100mm" />
@@ -11,7 +10,7 @@
   <arg name="use_rviz" default="true" doc="Launch RViz" />
   
   <!-- URDF file path -->
-  <arg name="urdf_file" default="$(find alicia_d_descriptions)/urdf/Alicia_D_$(arg robot_version)/Alicia_D_gripper_$(arg gripper_type).urdf" />
+  <arg name="urdf_file" default="$(find alicia_d_descriptions)/urdf/Alicia_D_v5_6/Alicia_D_v5_6_gripper_$(arg gripper_type).urdf" />
   
   <!-- Load URDF file -->
   <param name="robot_description" textfile="$(arg urdf_file)" />
