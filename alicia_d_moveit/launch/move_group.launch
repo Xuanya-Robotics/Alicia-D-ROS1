@@ -42,13 +42,11 @@
   <arg name="load_robot_description" default="false" />
   
   <!-- Robot configuration arguments -->
-  <arg name="robot_version" default="v5_6" doc="Robot version: v5_5 or v5_6" />
   <arg name="gripper_type" default="100mm" doc="Gripper type: 50mm or 100mm" />
 
   <!-- load URDF, SRDF and joint_limits configuration -->
   <include file="$(dirname)/planning_context.launch">
     <arg name="load_robot_description" value="$(arg load_robot_description)" />
-    <arg name="robot_version" value="$(arg robot_version)"/>
     <arg name="gripper_type" value="$(arg gripper_type)"/>
   </include>
 
@@ -86,7 +84,7 @@
 
   <!-- Sensors Functionality -->
   <include ns="move_group" file="$(dirname)/sensor_manager.launch.xml" if="$(arg allow_trajectory_execution)">
-    <arg name="moveit_sensor_manager" value="Alicia_D_$(arg robot_version)_gripper_$(arg gripper_type)" />
+    <arg name="moveit_sensor_manager" value="Alicia_D_v5_6_gripper_$(arg gripper_type)" />
   </include>
 
   <!-- Start the actual move_group node/action server -->

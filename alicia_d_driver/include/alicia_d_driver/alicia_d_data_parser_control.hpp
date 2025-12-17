@@ -12,6 +12,7 @@
 #include <thread>
 #include <atomic>
 #include <chrono>
+#include <algorithm>
 
 constexpr uint8_t FRAME_HEADER = 0xAA;
 constexpr uint8_t FRAME_FOOTER = 0xFF;
@@ -98,8 +99,35 @@ public:
     
     // Print information function
     void print_information() const;  // Print version, temperature, velocity, self-check info
-    double gripper_position_to_value(double position_m) const;  // Convert gripper position (meters) to value (0-1000)
-    double gripper_value_to_position(double gripper_value) const;  // Convert gripper value (0-1000) to position (meters)
+
+    // Shared gripper conversion helpers (single source of truth).
+    // Header-only to avoid extra link dependencies between catkin targets.
+    static inline double gripper_position_to_value(double position_m, const std::string& gripper_type)  // meters -> 0..1000
+    {
+        // Convert gripper position (meters) to value (0-1000)
+        // position: 0 = fully open, stroke_m = fully closed
+        // gripper value: 0 = fully closed, 1000 = fully open
+        const double stroke_m = (gripper_type == "100mm") ? 0.05 : 0.025;  // 50mm or 100mm
+
+        // Clamp position to valid range
+        const double m = std::max(0.0, std::min(stroke_m, position_m));
+        // Convert: position 0 (open) -> value 1000, position stroke_m (closed) -> value 0
+        const double value = 1000.0 - ((stroke_m > 1e-6 ? m / stroke_m : 0.0) * 1000.0);
+        return std::max(0.0, std::min(1000.0, value));
+    }
+
+    static inline double gripper_value_to_position(double gripper_value, const std::string& gripper_type)  // 0..1000 -> meters
+    {
+        // Convert gripper value (0-1000) to position (meters)
+        // gripper value: 0 = fully closed, 1000 = fully open
+        // position: 0 = fully open, stroke_m = fully closed
+        const double stroke_m = (gripper_type == "100mm") ? 0.05 : 0.025;  // 50mm or 100mm
+
+        // Clamp value to valid range
+        const double value = std::max(0.0, std::min(1000.0, gripper_value));
+        // Convert: value 0 (closed) -> position stroke_m, value 1000 (open) -> position 0
+        return (1.0 - (value / 1000.0)) * stroke_m;
+    }
 
 private:
     // Data parsing functions (matching data_parser.py)

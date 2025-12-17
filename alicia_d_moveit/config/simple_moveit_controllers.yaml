@@ -15,4 +15,4 @@ controller_list:
     type: FollowJointTrajectory
     default: True
     joints:
-      - right_finger
+      - Gripper

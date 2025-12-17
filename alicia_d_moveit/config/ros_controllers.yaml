@@ -8,7 +8,7 @@ joint_state_controller:
     - Joint4
     - Joint5
     - Joint6
-    - right_finger
+    - Gripper
     
 Alicia_controller:
   type: position_controllers/JointTrajectoryController
@@ -23,4 +23,4 @@ Alicia_controller:
 Gripper_controller:
   type: position_controllers/JointTrajectoryController
   joints:
-    - right_finger
+    - Gripper

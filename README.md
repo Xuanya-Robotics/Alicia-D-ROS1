@@ -20,7 +20,7 @@ Run the install script (it installs required dependencies and builds the workspa
 ```bash
 mkdir -p alicia_ws/src
 cd alicia_ws
-git clone https://github.com/Synria-Robotics/Alicia-D-ROS1.git -b v6.0.0 ./src/
+git clone https://github.com/Synria-Robotics/Alicia-D-ROS1.git -b v6.1.0 ./src/
 ./src/install/alicia_amd64_install.sh
 ```
 
@@ -55,12 +55,15 @@ sudo usermod -a -G dialout $USER
 # log out after setting
 
 # temporarily setting
-sudo chmod 666 /dev/ttyUSB*
+sudo chmod 666 /dev/ttyACM*
 ```
 - Check the hardware connection
 ```
-ls -l /dev/ttyUSB*
+ls -l /dev/ttyACM*
 ```
+
+- Basic usage documentation:
+  - See `docs/Basic_usage.md` for topics, units, and drag-teaching (record/replay).
 
 
 - Start the Alicia-D driver only:
@@ -71,7 +74,7 @@ roslaunch alicia_d_driver alicia_d_driver.launch
 Default serial port and baudrate is /dev/ttyUSB0 and 1000000 separately.
 For custom usage, running like the following:
 ```
-roslaunch alicia_d_driver alicia_d_driver.launch port:=/dev/ttyCH341USB0 gripper_type:=100mm 
+roslaunch alicia_d_driver alicia_d_driver.launch port:=/dev/ttyACM0 gripper_type:=100mm 
 ```
 
 Verify:
@@ -94,7 +97,7 @@ name:
   - Joint4
   - Joint5
   - Joint6
-  - right_finger
+  - Gripper
 position: [-0.011507665397765016, -0.01457637617050229, -0.006904599238658614, 0.002301533079553202, -0.008438954625027745, 0.0007671776931840699, 0.0001297016861219196]
 velocity: []
 effort: []
@@ -108,6 +111,24 @@ roslaunch alicia_d_driver alicia_d_bringup.launch gripper_type:=100mm
 ```
 
 Example of customized usage:
+
+- Drag teaching (record / replay):
+
+```bash
+roslaunch alicia_d_drag_teaching drag_teaching.launch mode:=auto save_motion:=demo
+```
+
+Replay only:
+
+```bash
+roslaunch alicia_d_drag_teaching drag_teaching.launch mode:=replay_only save_motion:=demo
+```
+
+Runtime change driver default speed (deg/s):
+
+```bash
+rostopic pub -1 /default_speed_deg_s std_msgs/Float64 "data: 20.0"
+```
 
 
 

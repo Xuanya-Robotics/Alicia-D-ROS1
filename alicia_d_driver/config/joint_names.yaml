@@ -5,4 +5,4 @@ joints:
   - Joint4
   - Joint5
   - Joint6
-  - right_finger
+  - Gripper

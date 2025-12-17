@@ -15,13 +15,13 @@ def main():
     # 创建关节状态消息
     joint_msg = JointState()
     joint_msg.header.stamp = rospy.Time.now()
-    joint_msg.name = ['Joint1', 'Joint2', 'Joint3', 'Joint4', 'Joint5', 'Joint6', 'right_finger']
+    joint_msg.name = ['Joint1', 'Joint2', 'Joint3', 'Joint4', 'Joint5', 'Joint6', 'Gripper']
     
     # 测试序列
     test_positions = [
         [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],  # 归零位置
-        [0.5, -0.3, 0.8, 0.0, 0.2, 0.0, 0.02], # 测试位置1
-        [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.04],  # 归零并打开夹爪
+        [0.5, -0.3, 0.8, 0.0, 0.2, 0.0, 200], # 测试位置1
+        [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1000],  # 归零并打开夹爪
     ]
     
     for i, positions in enumerate(test_positions):

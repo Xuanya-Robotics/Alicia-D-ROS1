@@ -525,7 +525,7 @@
     <mimic joint="Gripper" multiplier="-1" offset="0"/>
   </joint>
   <link
-    name="gripper_center">
+    name="tool0">
 
     <visual>
       <origin
@@ -551,7 +551,7 @@
     <parent
       link="Link6" />
     <child
-      link="gripper_center" />
+      link="tool0" />
     <axis
       xyz="0 0 0" />
   </joint>

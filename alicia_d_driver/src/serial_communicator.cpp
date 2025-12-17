@@ -147,7 +147,7 @@ bool SerialCommunicator::write_packet(const std::vector<uint8_t>& frame)
     std::lock_guard<std::mutex> lock(queue_mutex_);
     try {
         serial_port_.Write(frame);
-
+        // ROS_INFO("Written packet: %s", format_hex_bytes(frame).c_str());
         std::this_thread::sleep_for(std::chrono::milliseconds(10));
         try {
             serial_port_.FlushIOBuffers();
@@ -445,9 +445,14 @@ std::pair<bool, std::string> SerialCommunicator::check_serial_permissions(const 
         std::string solution;
         #ifdef __linux__
             solution = "  1. Add user '" + current_user + "' to dialout group:\n"
-                      "     sudo usermod -a -G dialout " + current_user + "\n"
-                      "  2. Log out and log back in, or run: newgrp dialout\n"
-                      "  3. Or temporarily use: sudo chmod 666 " + device_name + "\n";
+                      "     sudo usermod -aG dialout " + current_user + "\n"
+                      "  2. Apply without logout (start a new shell with dialout):\n"
+                      "     exec sg dialout -c \"$SHELL -l\"\n"
+                      "  3. Permanent (recommended): create a udev rule so permissions persist:\n"
+                      "     echo 'SUBSYSTEM==\"tty\", KERNEL==\"ttyACM*\", GROUP=\"dialout\", MODE=\"0660\"' | \\\n"
+                      "       sudo tee /etc/udev/rules.d/99-alicia-serial.rules\n"
+                      "     sudo udevadm control --reload-rules && sudo udevadm trigger\n"
+                      "  4. Temporary (not recommended): sudo chmod 666 " + device_name + "\n";
         #elif __APPLE__
             solution = "  1. Add user '" + current_user + "' to dialout or uucp group\n"
                       "  2. Or temporarily use: sudo chmod 666 " + device_name + "\n";

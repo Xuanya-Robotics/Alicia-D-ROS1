@@ -1,19 +1,37 @@
 <launch>
     <arg name="enable_teaching" default="true" />
-    <arg name="teaching_duration" default="10" />
+    <!-- teaching_duration (seconds): 0 means stop manually by pressing Enter -->
+    <arg name="teaching_duration" default="0" />
     <arg name="speed_factor" default="1.0" />
+    <!-- replay_speed_deg_s: 0 = derived from recorded timing; >0 caps speed -->
+    <arg name="replay_speed_deg_s" default="40.0" />
+    <arg name="save_motion" default="default" />
+    <!-- mode: manual | auto | replay_only -->
+    <arg name="mode" default="auto" />
+    <arg name="sample_hz" default="100.0" />
+    <arg name="gripper_type" default="100mm" />
+    <!-- driver_default_speed_deg_s: publish to /default_speed_deg_s to update driver runtime default speed -->
+    <arg name="driver_default_speed_deg_s" default="0.0" />
+    <!-- save_root: where example_motions/<motion>/... is stored -->
+    <arg name="save_root" default="$(find alicia_d_drag_teaching)/example_motions" />
+    <!-- replay: if true, replay after recording (ignored for replay_only which always replays) -->
+    <arg name="replay" default="true" />
     
-    <!-- 启动拖动示教模式节点 -->
-    <node name="demo_mode" pkg="alicia_d_drag_teaching" type="demo_mode.py" output="screen">
-        <!-- 使用arg变量的值设置参数 -->
-        <param name="enable_demo" value="$(arg enable_teaching)" />
-        <!-- 使用 respawn 参数，当节点崩溃时自动重启 -->
-        <param name="respawn" value="true" />
-    </node>
-    <!-- 启动拖动示教 -->
-    <node name="pose_recorder" pkg="alicia_d_drag_teaching" type="pose_record.py" output="screen" required="false">
-        <param name="record_duration" value="$(arg teaching_duration)" />
-        <param name="enable_replay" value="true" />
-    </node>
+    <!-- Start drag teaching -->
+    <group if="$(arg enable_teaching)">
+      <!-- replay enabled -->
+      <node if="$(arg replay)" name="drag_teaching" pkg="alicia_d_drag_teaching" type="drag_teaching.py" output="screen" required="false"
+            args="--mode $(arg mode) --save-motion $(arg save_motion) --sample-hz $(arg sample_hz) --speed-factor $(arg speed_factor) --duration $(arg teaching_duration) --gripper-type $(arg gripper_type) --driver-default-speed-deg-s $(arg driver_default_speed_deg_s) --save-root $(arg save_root) --replay-speed-deg-s $(arg replay_speed_deg_s) --replay">
+        <param name="gripper_type" type="string" value="$(arg gripper_type)"/>
+        <param name="save_root" type="string" value="$(arg save_root)"/>
+      </node>
+
+      <!-- replay disabled -->
+      <node unless="$(arg replay)" name="drag_teaching" pkg="alicia_d_drag_teaching" type="drag_teaching.py" output="screen" required="false"
+            args="--mode $(arg mode) --save-motion $(arg save_motion) --sample-hz $(arg sample_hz) --speed-factor $(arg speed_factor) --duration $(arg teaching_duration) --gripper-type $(arg gripper_type) --driver-default-speed-deg-s $(arg driver_default_speed_deg_s) --save-root $(arg save_root) --replay-speed-deg-s $(arg replay_speed_deg_s)">
+        <param name="gripper_type" type="string" value="$(arg gripper_type)"/>
+        <param name="save_root" type="string" value="$(arg save_root)"/>
+      </node>
+    </group>
 
 </launch>

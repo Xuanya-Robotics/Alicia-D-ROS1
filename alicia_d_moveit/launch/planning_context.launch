@@ -1,7 +1,4 @@
 <launch>
-  <!-- Robot version argument -->
-  <arg name="robot_version" default="v5_6" doc="Robot version: v5_5 or v5_6" />
-  
   <!-- Gripper type argument -->
   <arg name="gripper_type" default="100mm" doc="Gripper type: 50mm or 100mm" />
 
@@ -13,11 +10,11 @@
   <!-- The name of the parameter under which the URDF is loaded -->
   <arg name="robot_description" default="robot_description"/>
 
-  <!-- URDF file path -->
-  <arg name="urdf_file" default="$(find alicia_d_descriptions)/urdf/Alicia_D_$(arg robot_version)/Alicia_D_gripper_$(arg gripper_type).urdf" />
-  
-  <!-- SRDF file path -->
-  <arg name="srdf_file" default="$(find alicia_d_moveit)/config/Alicia_D_$(arg robot_version)_gripper_$(arg gripper_type).srdf" />
+  <!-- URDF/SRDF file paths -->
+  <!-- ROS1 descriptions package only ships v5_6 URDFs with filenames:
+       Alicia_D_v5_6_gripper_50mm.urdf / Alicia_D_v5_6_gripper_100mm.urdf -->
+  <arg name="urdf_file" default="$(find alicia_d_descriptions)/urdf/Alicia_D_v5_6/Alicia_D_v5_6_gripper_$(arg gripper_type).urdf" />
+  <arg name="srdf_file" default="$(find alicia_d_moveit)/config/Alicia_D_v5_6_gripper_$(arg gripper_type).srdf" />
 
   <!-- Load universal robot description format (URDF) -->
   <param if="$(arg load_robot_description)" name="$(arg robot_description)" textfile="$(arg urdf_file)"/>

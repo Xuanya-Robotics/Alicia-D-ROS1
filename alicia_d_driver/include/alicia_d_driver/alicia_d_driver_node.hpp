@@ -4,6 +4,7 @@
 #include <ros/ros.h>
 #include <sensor_msgs/JointState.h>
 #include <std_msgs/Bool.h>
+#include <std_msgs/Float64.h>
 #include <memory>
 #include <vector>
 #include <string>
@@ -26,6 +27,7 @@ private:
   void jointCommandCallback(const sensor_msgs::JointState::ConstPtr& msg);
   void zeroCalibrateCallback(const std_msgs::Bool::ConstPtr& msg);
   void demonstrationModeCallback(const std_msgs::Bool::ConstPtr& msg);
+  void defaultSpeedCallback(const std_msgs::Float64::ConstPtr& msg);
 
   // Timer callbacks
   void heartbeatTimerCallback(const ros::TimerEvent& event);
@@ -52,10 +54,12 @@ private:
   ros::Subscriber joint_command_sub_;
   ros::Subscriber zero_calib_sub_;
   ros::Subscriber demo_mode_sub_;
+  ros::Subscriber default_speed_sub_;
 
   // Configuration
   bool   debug_mode_          = false;
   double default_speed_deg_s_ = 20.0;
+  std::string gripper_type_   = "50mm";
 
   // State for heartbeat
   std::vector<std::string> joint_names_ = {

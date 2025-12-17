@@ -1,4 +1,7 @@
 #include "alicia_d_driver/alicia_d_hw_interface.h"
+#include "alicia_d_driver/alicia_d_data_parser_control.hpp"
+#include <cmath>
+#include <sstream>
 #include <vector>
 
 namespace alicia_d_driver
@@ -7,12 +10,20 @@ AliciaDHardwareInterface::AliciaDHardwareInterface(ros::NodeHandle& nh) : nh_(nh
 
 bool AliciaDHardwareInterface::init()
 {
+    // Private parameters are set inside the <node> tag in the launch file.
+    // Use a private node handle so we actually read them (e.g. ~gripper_type).
+    ros::NodeHandle pnh("~");
+
     // Get joint names from the parameter server
     if (!nh_.getParam("joints", joint_names_))
     {
         ROS_ERROR("Could not find 'joints' parameter on the parameter server.");
         return false;
     }
+
+    // Gripper type (optional): "50mm" (default) or "100mm"
+    pnh.param<std::string>("gripper_type", gripper_type_, std::string("50mm"));
+
     num_joints_ = joint_names_.size();
     ROS_INFO("Initializing hardware interface for %d joints.", (int)num_joints_);
 
@@ -26,8 +37,8 @@ bool AliciaDHardwareInterface::init()
     
     // Initialize change detection thresholds
     // Get parameters with reasonable defaults
-    nh_.param<double>("min_joint_change_threshold", min_joint_change_threshold_, 0.01); // 0.01 rad ≈ 0.5 degrees
-    nh_.param<double>("min_gripper_change_threshold", min_gripper_change_threshold_, 0.001); // 0.001 m = 1 mm
+    pnh.param<double>("min_joint_change_threshold", min_joint_change_threshold_, 0.01); // 0.01 rad ≈ 0.5 degrees
+    pnh.param<double>("min_gripper_change_threshold", min_gripper_change_threshold_, 0.001); // 0.001 m = 1 mm
     
     ROS_INFO("Change detection thresholds: joint=%.4f rad (%.1f deg), gripper=%.4f m (%.1f mm)",
              min_joint_change_threshold_, min_joint_change_threshold_ * 180.0 / M_PI,
@@ -68,7 +79,6 @@ void AliciaDHardwareInterface::jointStateCallback(const sensor_msgs::JointState:
 {
     std::lock_guard<std::mutex> lock(command_mutex_); // Lock to ensure thread safety
 
-    // Update joint positions from the received message
     for (size_t i = 0; i < msg->name.size() && i < msg->position.size(); ++i)
     {
         auto it = joint_name_to_index_map_.find(msg->name[i]);
@@ -78,10 +88,22 @@ void AliciaDHardwareInterface::jointStateCallback(const sensor_msgs::JointState:
             size_t index = it->second;
             if (index < joint_positions_.size())
             {
-                raw_joint_positions_[index] = msg->position[i];
+                // Driver publishes raw gripper value (0..1000) on /joint_states, but ros_control
+                // expects a position (meters). Convert only for the gripper joint.
+                if (msg->name[i] == "Gripper")
+                {
+                    raw_joint_positions_[index] = AliciaDDataParserControl::gripper_value_to_position(
+                        msg->position[i], gripper_type_);
+                }
+                else
+                {
+                    raw_joint_positions_[index] = msg->position[i];
+                }
             }
         }
     }
+    // Mark that we have a valid state sample (used to suppress initial startup commands)
+    received_joint_state_ = true;
 }
 
 
@@ -97,6 +119,23 @@ void AliciaDHardwareInterface::read(const ros::Time& time, const ros::Duration& 
 
 void AliciaDHardwareInterface::write(const ros::Time& time, const ros::Duration& period)
 {
+    // Do not send any commands until we have received at least one real /joint_states sample.
+    // This prevents startup from sending an arbitrary "initial state" command to the robot.
+    if (!received_joint_state_)
+    {
+        return;
+    }
+
+    // Initialize command buffers from the first received state and skip sending on that cycle.
+    // This ensures controllers start from the actual robot state (no jump).
+    if (!commands_initialized_from_state_)
+    {
+        joint_position_commands_ = raw_joint_positions_;
+        last_sent_positions_ = raw_joint_positions_;
+        commands_initialized_from_state_ = true;
+        return;
+    }
+
     // Check if any joint has changed significantly
     bool needs_update = false;
     for (size_t i = 0; i < num_joints_; ++i)
@@ -122,6 +161,18 @@ void AliciaDHardwareInterface::write(const ros::Time& time, const ros::Duration&
         command_msg.name = joint_names_;
         command_msg.position = joint_position_commands_;
 
+        // Convert gripper command from position (meters) -> raw value (0..1000)
+        // so the driver node can consume it directly.
+        for (size_t i = 0; i < command_msg.name.size() && i < command_msg.position.size(); ++i)
+        {
+            if (command_msg.name[i] == "Gripper")
+            {
+                command_msg.position[i] = AliciaDDataParserControl::gripper_position_to_value(
+                    command_msg.position[i], gripper_type_);
+                // ROS_INFO("Gripper command: %f", command_msg.position[i]);
+                break;
+            }
+        }    
         // Publish the joint command message
         joint_command_pub_.publish(command_msg);
         

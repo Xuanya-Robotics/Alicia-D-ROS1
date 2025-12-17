@@ -470,11 +470,13 @@ bool AliciaDDataParserControl::set_joint_and_gripper(const std::vector<double>& 
         ROS_ERROR("Speed must be positive: %.2f deg/s", speed_deg_s);
         return false;
     }
+    // ROS_INFO("Gripper value: %f", gripper_value);
     std::vector<uint8_t> frame = build_joint_frame(joint_angles, gripper_value, speed_deg_s);
     
     if (debug_mode_) {
         ROS_DEBUG("Send combined control: %s", frame_to_hex_string(frame).c_str());
     }
+    // ROS_INFO("Sending frame: %s", frame_to_hex_string(frame).c_str());
 
     return communicator_->write_packet(frame);
 }
@@ -685,35 +687,6 @@ std::optional<SelfCheckData> AliciaDDataParserControl::get_self_check_data() con
     return self_check_data_;
 }
 
-double AliciaDDataParserControl::gripper_position_to_value(double position_m) const
-{
-    // Convert gripper position (meters) to value (0-1000)
-    // position: 0 = fully open, stroke_m = fully closed
-    // gripper value: 0 = fully closed, 1000 = fully open
-    std::lock_guard<std::mutex> lock(state_mutex_);
-    double stroke_m = (gripper_type_ == "100mm") ? 0.05 : 0.025;  // 50mm or 100mm
-    
-    // Clamp position to valid range
-    double m = std::max(0.0, std::min(stroke_m, position_m));
-    // Convert: position 0 (open) -> value 1000, position stroke_m (closed) -> value 0
-    double gripper_value = 1000.0 - ((stroke_m > 1e-6 ? m / stroke_m : 0.0) * 1000.0);
-    return std::max(0.0, std::min(1000.0, gripper_value));
-}
-
-double AliciaDDataParserControl::gripper_value_to_position(double gripper_value) const
-{
-    // Convert gripper value (0-1000) to position (meters)
-    // gripper value: 0 = fully closed, 1000 = fully open
-    // position: 0 = fully open, stroke_m = fully closed
-    std::lock_guard<std::mutex> lock(state_mutex_);
-    double stroke_m = (gripper_type_ == "100mm") ? 0.05 : 0.025;  // 50mm or 100mm
-    
-    // Clamp value to valid range
-    double value = std::max(0.0, std::min(1000.0, gripper_value));
-    // Convert: value 0 (closed) -> position stroke_m, value 1000 (open) -> position 0
-    double position_m = (1.0 - (value / 1000.0)) * stroke_m;
-    return position_m;
-}
 
 void AliciaDDataParserControl::print_information() const
 {

@@ -6,13 +6,15 @@
   -->
   <!-- Choose MoveIt controller manager: fake | simple | ros_control -->
   <arg name="moveit_controller_manager" default="ros_control"/>
-  <arg name="port" default="/dev/ttyUSB0" />
-  <arg name="baudrate" default="1000000" />
-  <arg name="firmware_version" default="auto" />
-  <!-- Robot version: v5_5 or v5_6. Default v5_6 supports both 50mm and 100mm grippers -->
-  <arg name="robot_version" default="v5_6" />
+  <!-- Serial port for robot connection. Leave empty for auto-detection -->
+  <arg name="port" default="" />
+  <!-- Default joint speed in degrees per second (4.39–439.45) -->
+  <arg name="default_speed_deg_s" default="20.0" />
+  <arg name="debug_mode" default="false" />
   <arg name="gripper_type" default="100mm" />
-  <!-- Defer URDF loading; driver will publish robot_description after firmware detection -->
+  <!-- Optional override: prismatic joint range for 'Gripper' joint in meters (URDF upper limit).
+       If unset/0, derived from gripper_type (50mm->0.025, 100mm->0.05). -->
+  <arg name="gripper_stroke_m" default="0.0" />
 
   <!-- Load the ROS controllers configuration -->
   <rosparam file="$(find alicia_d_driver)/config/controllers.yaml" command="load" />
@@ -28,30 +30,14 @@
     
       <!-- Serial Port Configuration -->
       <param name="port"           type="string" value="$(arg port)"/>
-      <param name="baud_rate"      type="int"    value="$(arg baudrate)"/>
-      
-      <!-- Firmware Version Configuration -->
-      <param name="firmware_version" type="string" value="$(arg firmware_version)"/>
-      
-      <!-- Gripper Type Configuration -->
+
+      <!-- Driver speed configuration (deg/s) -->
+      <param name="default_speed_deg_s" type="double" value="$(arg default_speed_deg_s)"/>
+
+      <!-- Optional debug output -->
+      <param name="debug_mode" type="bool" value="$(arg debug_mode)"/>
       <param name="gripper_type" type="string" value="$(arg gripper_type)"/>
-      
-      <!-- Driver Behavior Configuration -->
-      <param name="debug_mode"     type="bool"   value="false"/>
-      <param name="rate_limit_sec" type="double" value="0.01"/>
-      <!-- Let the driver load robot_description after firmware detection -->
-      <param name="load_robot_description" type="bool" value="true"/>
-      
-      <!-- Speed Control for V6+ firmware -->
-      <param name="default_speed_rad_s" type="double" value="0.349"/>  <!-- ~20 deg/s default -->
-        <!-- Command streaming and smoothing -->
-        <param name="command_rate_hz"           type="double" value="100.0"/>  <!-- Reduced for efficiency -->
-        <param name="use_trajectory_smoothing"  type="bool"   value="true"/>
-        <param name="max_joint_velocity_rad_s"  type="double" value="5.0"/>  <!-- Increased for better responsiveness -->
-        <param name="max_joint_accel_rad_s2"    type="double" value="20.0"/>  <!-- Increased for better responsiveness -->
-        <param name="max_gripper_velocity_rad_s" type="double" value="3.0"/>  <!-- Increased for better responsiveness -->
-        <param name="max_gripper_accel_rad_s2"   type="double" value="20.0"/>  <!-- Increased for better responsiveness -->
-        <param name="gripper_input_is_percent"  type="bool"   value="false"/>
+      <param name="gripper_stroke_m" type="double" value="$(arg gripper_stroke_m)"/>
   </node>
 
 
@@ -60,7 +46,10 @@
   <rosparam file="$(find alicia_d_driver)/config/joint_names.yaml" command="load" />
   
   <!-- Start the ros_control hardware interface node -->
-  <node name="alicia_d_hw_interface" pkg="alicia_d_driver" type="alicia_d_hw_interface_node" output="screen"/>
+  <node name="alicia_d_hw_interface" pkg="alicia_d_driver" type="alicia_d_hw_interface_node" output="screen">
+    <param name="gripper_type" type="string" value="$(arg gripper_type)"/>
+    <param name="gripper_stroke_m" type="double" value="$(arg gripper_stroke_m)"/>
+  </node>
 
   <!-- Load the robot state publisher. Waits for robot_description via launch-prefix delay -->
   <node name="robot_state_publisher" pkg="robot_state_publisher" type="robot_state_publisher" output="screen" launch-prefix="bash -c 'sleep 2; $0 $@' "/>
@@ -84,8 +73,8 @@
   <!-- Run the main MoveIt! planning execution context -->
   <!-- Note: move_group has respawn="true" so initial failures are handled gracefully -->
   <include file="$(find alicia_d_moveit)/launch/move_group.launch">
-    <arg name="load_robot_description" value="false"/>
-    <arg name="robot_version" value="$(arg robot_version)"/>
+    <!-- The updated driver no longer publishes robot_description; let MoveIt load it -->
+    <arg name="load_robot_description" value="true"/>
     <arg name="gripper_type" value="$(arg gripper_type)"/>
     <!-- Pass controller manager selection as arg -->
     <arg name="moveit_controller_manager" value="$(arg moveit_controller_manager)" />

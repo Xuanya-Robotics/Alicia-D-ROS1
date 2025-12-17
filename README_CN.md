@@ -20,7 +20,7 @@ Alicia-D 系列机械臂为远程操作数据采集以及复现前沿机器人�
 ```bash
 mkdir -p alicia_ws/src
 cd alicia_ws
-git clone https://github.com/Synria-Robotics/Alicia-D-ROS1.git -b v6.0.0 ./src/
+git clone https://github.com/Synria-Robotics/Alicia-D-ROS1.git -b v6.1.0 ./src/
 ./src/install/alicia_amd64_install.sh
 ```
 
@@ -55,18 +55,21 @@ sudo usermod -a -G dialout $USER
 # 设置后需要重新登录
 
 # 临时设置
-sudo chmod 666 /dev/ttyUSB*
+sudo chmod 666 /dev/ttyACM*
 ```
 
 - 检查硬件连接
 ```bash
-ls -l /dev/ttyUSB*
+ls -l /dev/ttyACM*
 ```
+
+- 基础使用文档：
+  - 参考 `docs/Basic_usage.md`（topics、单位说明、拖动示教录制/回放）。
 
 - 仅启动 Alicia-D 驱动：
 
 ```bash
-roslaunch alicia_d_driver alicia_d_driver.launch port:=/dev/ttyUSB0 gripper_type:=100mm
+roslaunch alicia_d_driver alicia_d_driver.launch port:=/dev/ttyACM0 gripper_type:=100mm
 ```
 
 
@@ -80,7 +83,25 @@ rostopic echo /joint_states
 - 启动 Alicia-D 驱动并加载 MoveIt：
 
 ```
-roslaunch alicia_d_driver alicia_d_bringup.launch port:=/dev/ttyUSB0 gripper_type:=100mm
+roslaunch alicia_d_driver alicia_d_bringup.launch port:=/dev/ttyACM0 gripper_type:=100mm
+```
+
+- 拖动示教（录制 / 回放）：
+
+```bash
+roslaunch alicia_d_drag_teaching drag_teaching.launch mode:=auto save_motion:=demo
+```
+
+仅回放：
+
+```bash
+roslaunch alicia_d_drag_teaching drag_teaching.launch mode:=replay_only save_motion:=demo
+```
+
+运行时修改驱动默认速度（度/秒）：
+
+```bash
+rostopic pub -1 /default_speed_deg_s std_msgs/Float64 "data: 20.0"
 ```
 
 - USB 相机标定

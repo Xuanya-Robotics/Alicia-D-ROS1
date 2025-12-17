@@ -49,11 +49,12 @@ void AliciaDDriverNode::loadParameters()
   pnh_.param<std::string>("port", port, std::string(""));
   pnh_.param<double>("default_speed_deg_s", default_speed_deg_s_, 20.0);
   pnh_.param<bool>("debug_mode", debug_mode_, false);
+  pnh_.param<std::string>("gripper_type", gripper_type_, std::string("50mm"));
 
   communicator_ = std::make_unique<SerialCommunicator>(port, 1000000, debug_mode_);
-  // Gripper type is not configurable in driver node (use hardware interface for that)
+  // Gripper type controls value<->meters conversion used for publishing /joint_states
   data_parser_control_ = std::make_unique<AliciaDDataParserControl>(
-      communicator_.get(), debug_mode_, "50mm");  // Default to 50mm
+      communicator_.get(), debug_mode_, gripper_type_);
 
   ROS_INFO("Configured port: %s, baud: %u (fixed), debug: %s, default_speed: %.1f deg/s",
            port.c_str(), 1000000u, debug_mode_ ? "true" : "false", default_speed_deg_s_);
@@ -71,6 +72,10 @@ void AliciaDDriverNode::setupRosCommunications()
                                   &AliciaDDriverNode::zeroCalibrateCallback, this);
   demo_mode_sub_ = nh_.subscribe("/demonstration", 10,
                                  &AliciaDDriverNode::demonstrationModeCallback, this);
+  // Allow changing driver default speed at runtime (deg/s).
+  // Publish std_msgs/Float64 to /default_speed_deg_s.
+  default_speed_sub_ = nh_.subscribe("/default_speed_deg_s", 10,
+                                     &AliciaDDriverNode::defaultSpeedCallback, this);
 
   // Heartbeat publisher to keep /joint_states fresh (reads from parser and publishes)
   heartbeat_timer_ = nh_.createTimer(ros::Duration(0.01),
@@ -79,6 +84,17 @@ void AliciaDDriverNode::setupRosCommunications()
   // Periodically request joint data from robot (non-blocking)
   joint_request_timer_ = nh_.createTimer(ros::Duration(0.01),
                                          &AliciaDDriverNode::jointRequestTimerCallback, this);
+}
+
+void AliciaDDriverNode::defaultSpeedCallback(const std_msgs::Float64::ConstPtr& msg)
+{
+    const double v = msg ? msg->data : 0.0;
+    if (!(v > 0.0)) {
+        ROS_WARN("Ignored /default_speed_deg_s=%.3f (must be > 0).", v);
+        return;
+    }
+    default_speed_deg_s_ = v;
+    ROS_INFO("Updated default_speed_deg_s to %.3f deg/s via /default_speed_deg_s.", default_speed_deg_s_);
 }
 
 void AliciaDDriverNode::reconnectTimerCallback(const ros::TimerEvent&)
@@ -199,7 +215,9 @@ void AliciaDDriverNode::heartbeatTimerCallback(const ros::TimerEvent&)
     if (joint_state.has_value()) {
         // Publish joint positions (6 joints + gripper)
         js.position = joint_state->angles;
-        js.position.push_back(data_parser_control_->gripper_value_to_position(joint_state->gripper));
+        // Publish gripper as prismatic joint position (meters) for MoveIt/RViz
+        js.position.push_back(AliciaDDataParserControl::gripper_value_to_position(
+            joint_state->gripper, gripper_type_));
         
         // Publish velocities if available
         if (velocity_data.has_value() && velocity_data->velocities.size() >= 6) {

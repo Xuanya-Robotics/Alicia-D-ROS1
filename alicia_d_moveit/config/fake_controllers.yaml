@@ -11,7 +11,7 @@ controller_list:
   - name: Gripper_controller
     type: $(arg fake_execution_type)
     joints:
-      - right_finger
+      - Gripper
 initial:  # Define initial robot poses per group
   - group: Alicia
     pose: home

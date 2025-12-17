@@ -9,6 +9,7 @@
 #include <string>
 #include <vector>
 #include <mutex> 
+#include <map>
 
 namespace alicia_d_driver
 {
@@ -50,10 +51,15 @@ private:
     std::vector<double> raw_joint_positions_;
     std::mutex command_mutex_;
     bool is_initialized_ = false;
+    bool received_joint_state_ = false;
+    bool commands_initialized_from_state_ = false;
     
     // Minimum change thresholds (in radians for joints, meters for gripper)
     double min_joint_change_threshold_;
     double min_gripper_change_threshold_;
+
+    // Gripper config (used to project raw 0..1000 <-> 0..stroke_m meters)
+    std::string gripper_type_;
 
 };
 
