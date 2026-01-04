@@ -55,7 +55,6 @@
     <arg name="debug" value="$(arg debug)"/>
     <arg name="pipeline" value="$(arg pipeline)"/>
     <arg name="load_robot_description" value="$(arg load_robot_description)"/>
-    <arg name="robot_version" value="$(arg robot_version)"/>
     <arg name="gripper_type" value="$(arg gripper_type)"/>
   </include>
 
