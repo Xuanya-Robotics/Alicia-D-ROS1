@@ -1,0 +1,84 @@
+<launch>
+    <!-- =============================================================== -->
+    <!-- 参数 -->
+    <!-- =============================================================== -->
+    <arg name="namespace_prefix" default="d405_handeyecalibration" />
+    <arg name="marker_size" doc="ArUco 标记尺寸(m)" default="0.05"/>
+    <arg name="marker_id" doc="ArUco 标记 ID" default="100"/>
+
+    <!-- RealSense D405 相机参数 -->
+    <arg name="camera_name" default="camera" />
+    <arg name="enable_depth" default="true" />
+    <arg name="enable_color" default="true" />
+    <arg name="color_width" default="640" />
+    <arg name="color_height" default="480" />
+    <arg name="color_fps" default="30" />
+    <arg name="depth_width" default="640" />
+    <arg name="depth_height" default="480" />
+    <arg name="depth_fps" default="30" />
+
+    <!-- =============================================================== -->
+    <!-- 启动 Intel RealSense D405 相机 -->
+    <!-- D405 是近距离高精度深度相机，适合眼在手上标定 -->
+    <!-- =============================================================== -->
+    <include file="$(find realsense2_camera)/launch/rs_camera.launch">
+        <arg name="camera" value="$(arg camera_name)" />
+        <arg name="enable_depth" value="$(arg enable_depth)" />
+        <arg name="enable_color" value="$(arg enable_color)" />
+        <arg name="color_width" value="$(arg color_width)" />
+        <arg name="color_height" value="$(arg color_height)" />
+        <arg name="color_fps" value="$(arg color_fps)" />
+        <arg name="depth_width" value="$(arg depth_width)" />
+        <arg name="depth_height" value="$(arg depth_height)" />
+        <arg name="depth_fps" value="$(arg depth_fps)" />
+        <arg name="align_depth" value="true" />
+    </include>
+
+    <!-- =============================================================== -->
+    <!-- 启动 ArUco 标记检测 -->
+    <!-- =============================================================== -->
+    <node name="aruco_tracker" pkg="aruco_ros" type="single" output="screen">
+        <remap from="/camera_info" to="/$(arg camera_name)/color/camera_info" />
+        <remap from="/image" to="/$(arg camera_name)/color/image_raw" />
+        <param name="image_is_rectified" value="true"/>
+        <param name="marker_size" value="$(arg marker_size)"/>
+        <param name="marker_id" value="$(arg marker_id)"/>
+        
+        <!-- ArUco 结果相对于 camera_color_optical_frame 发布 -->
+        <param name="reference_frame" value="$(arg camera_name)_color_optical_frame"/>
+        <!-- RealSense D405 的彩色相机光学坐标系 -->
+        <param name="camera_frame" value="$(arg camera_name)_color_optical_frame"/>
+        
+        <!-- 发布的标记坐标系名称 -->
+        <param name="marker_frame" value="camera_marker" />
+    </node>
+
+    <!-- =============================================================== -->
+    <!-- 启动 easy_handeye：Eye-on-Hand (相机在机械臂末端) -->
+    <!-- =============================================================== -->
+    <include file="$(find easy_handeye)/launch/calibrate.launch">
+        <arg name="namespace_prefix" value="$(arg namespace_prefix)" />
+        <arg name="eye_on_hand" value="true" />
+
+        <!-- 相机基础坐标系 (easy_handeye发布 tool0->camera_link) -->
+        <arg name="tracking_base_frame" value="$(arg camera_name)_link" />
+
+        <!-- 检测到的标记坐标系 (由 ArUco 发布) -->
+        <arg name="tracking_marker_frame" value="camera_marker" />
+
+        <!-- 机器人基坐标系 -->
+        <arg name="robot_base_frame" value="base_link" />
+        <!-- 相机安装在此连杆上 -->
+        <arg name="robot_effector_frame" value="tool0" />
+
+        <!-- MoveIt 配置 -->
+        <arg name="move_group" value="Alicia" />
+        <arg name="move_group_namespace" value="/" />
+
+        <!-- 机器人运动参数 -->
+        <arg name="freehand_robot_movement" value="false" />
+        <arg name="robot_velocity_scaling" value="0.3" />
+        <arg name="robot_acceleration_scaling" value="0.15" />
+    </include>
+
+</launch>
