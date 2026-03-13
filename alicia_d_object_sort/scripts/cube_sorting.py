@@ -1,6 +1,7 @@
 import os
 import sys
 import time
+import argparse
 import rospy
 import tf2_ros
 import tf_conversions
@@ -20,10 +21,21 @@ from std_msgs.msg import String
 
 
 class CubeSorting:
-    def __init__(self):
+    # Camera type configurations for hand-eye calibration
+    CAMERA_CONFIGS = {
+        'usb': {
+            'handeye_yaml': 'usb_handeyecalibration_eye_on_hand.yaml',
+        },
+        'd405': {
+            'handeye_yaml': 'd405_handeyecalibration_eye_on_hand.yaml',
+        },
+    }
+
+    def __init__(self, camera_type='usb'):
         # Ensure this script is a ROS node (MoveItRobotController will also init if needed)
         if not rospy.get_node_uri():
             rospy.init_node('cube_sorting', anonymous=True)
+        self.camera_type = camera_type
         self.moveit_control = MoveItRobotController()
         self.q = quaternion_from_euler(0, np.pi, 0)
         # self.q = quaternion_from_euler(0, np.pi - 0.175, 0)
@@ -31,8 +43,9 @@ class CubeSorting:
         # TF listener for base_link <-> tool0
         self.tf_buffer = tf2_ros.Buffer()
         self.tf_listener = tf2_ros.TransformListener(self.tf_buffer)
-        # Load hand-eye (camera -> tool0)
+        # Load hand-eye (camera -> tool0) based on camera type
         self.T_cam_tool0 = self._load_handeye_transform()
+        rospy.loginfo(f"CubeSorting initialized with camera type: {camera_type}")
         
         # Subscribe to vision topics for cubes AND cans
         self.sub_cubes_green = rospy.Subscriber('vision/cubes/green', PoseArray, self._on_cubes_green)
@@ -51,7 +64,7 @@ class CubeSorting:
         self._moving_now = False
         
         # Predefined positions 
-        self.HOME_POSITION = [0.5101731659675737, -0.1741493363528409, 1.1561367836287713, 0.03145428542055679, -1.5228477209708768, -0.5163105875130477]
+        self.HOME_POSITION = [0.0, 0.1089, 0.6703, 0.0, -1.4174, 0.0]
             
         self.DROP_ZONE_POSITION = [1.4139084885387032, 0.08822543471619682, 0.33985971808065407, 0.046797839284243144, -1.2804195699246312, -1.3249158761293214]
         self.DROP_ZONE_POSITION_2 = [1.3218471653565846, -0.24012661796669224, 0.8032350447639837, -0.026851219261451377, -1.4292520424023896, -1.1837551805834068]
@@ -287,15 +300,23 @@ class CubeSorting:
 
 
     def _load_handeye_transform(self):
-        """Load T_cam_tool0 from yaml. Returns 4x4 np.array or None."""
-        yaml_path = "/home/xuanya/.ros/easy_handeye/usb_handeyecalibration_eye_on_hand.yaml"
+        """Load T_cam_tool0 from yaml based on camera type. Returns 4x4 np.array or None."""
+        config = self.CAMERA_CONFIGS.get(self.camera_type, self.CAMERA_CONFIGS['usb'])
+        handeye_filename = config['handeye_yaml']
+        
+        # Try user home directory first, then script directory
+        yaml_path = os.path.expanduser(f"~/.ros/easy_handeye/{handeye_filename}")
         if not os.path.exists(yaml_path):
-            yaml_path = os.path.join(os.path.dirname(__file__), 'usb_handeyecalibration_eye_on_hand.yaml')
+            yaml_path = os.path.join(os.path.dirname(__file__), handeye_filename)
         if not os.path.exists(yaml_path):
+            rospy.logwarn(f"Hand-eye calibration file not found: {handeye_filename}")
             return None
+        
         import yaml
         with open(yaml_path, 'r') as f:
             data = yaml.safe_load(f)
+        rospy.loginfo(f"Loaded hand-eye calibration from: {yaml_path}")
+        
         t = data.get('transformation', {})
         qw = float(t.get('qw', 1.0)); qx = float(t.get('qx', 0.0)); qy = float(t.get('qy', 0.0)); qz = float(t.get('qz', 0.0))
         tx = float(t.get('x', 0.0)); ty = float(t.get('y', 0.0)); tz = float(t.get('z', 0.0))
@@ -334,17 +355,26 @@ class CubeSorting:
 if __name__ == "__main__":
     import time
     
-    # Create cube sorting controller
-    cube_sorting = CubeSorting()
+    # Parse command line arguments
+    parser = argparse.ArgumentParser(description='Cube sorting with hand-eye calibration')
+    parser.add_argument('--camera', '-c', type=str, default='usb', choices=['usb', 'd405'],
+                        help='Camera type: usb (default) or d405 (Intel RealSense D405)')
+    parser.add_argument('--manual', '-m', action='store_true',
+                        help='Run in manual testing mode instead of automated workflow')
+    args = parser.parse_args()
+    
+    # Create cube sorting controller with specified camera type
+    cube_sorting = CubeSorting(camera_type=args.camera)
     
     # Set up workflow mode
-    WORKFLOW_MODE = True  # Set to True for automated workflow, False for manual testing
+    WORKFLOW_MODE = not args.manual
     
     if WORKFLOW_MODE:
         rospy.loginfo("Starting automated cube sorting workflow...")
+        rospy.loginfo(f"Camera type: {args.camera}")
         rospy.loginfo("Instructions:")
         rospy.loginfo("1. Robot will move to home position for cube detection")
-        rospy.loginfo("2. Start camera_a4_to_base.py in 'cubes' mode to detect cubes")
+        rospy.loginfo(f"2. Start camera_obj_detection.py with --camera {args.camera} to detect cubes")
         rospy.loginfo("3. Robot will pick up cubes and move to drop zone")
         rospy.loginfo("4. Switch camera to 'cans' mode to detect placement cans")
         rospy.loginfo("5. Robot will drop cubes in appropriate cans")

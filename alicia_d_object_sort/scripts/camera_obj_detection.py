@@ -1,11 +1,13 @@
 import os
 import cv2
 import yaml
+import argparse
 import numpy as np
 try:
     import rospy
     from geometry_msgs.msg import PoseArray, Pose, PoseStamped
     from std_msgs.msg import Header, String
+    from sensor_msgs.msg import Image, CameraInfo
 except Exception:
     rospy = None
 
@@ -52,43 +54,73 @@ def _quaternion_to_rotation_matrix(qw: float, qx: float, qy: float, qz: float) -
 class TransformHelper:
     """Helper for camera->tool0 and camera->base_link transforms.
 
-    - Loads hand-eye `T_cam_tool0` from `usb_handeyecalibration_eye_on_hand.yaml`.
-    - Optionally uses ROS TF to lookup `base_link <- tool0` for camera->base_link.
+    - Loads hand-eye `T_tool0_camlink` from calibration yaml file.
+    - Supports both USB camera and D405 camera configurations.
+    - For D405: handles transform from camera_color_optical_frame to camera_link.
+    - Publishes hand-eye TF (tool0 -> camera_link) to complete TF tree.
+    - Uses ROS TF to lookup `base_link <- tool0` for camera->base_link.
     """
 
-    def __init__(self, enable_ros_tf=True):
-        self.T_cam_tool0 = None
+    # Camera type configurations
+    CAMERA_CONFIGS = {
+        'usb': {
+            'handeye_yaml': 'usb_handeyecalibration_eye_on_hand.yaml',
+            'intrinsics_yaml': 'head_camera.yaml',
+            'image_topic': None,  # Use cv2.VideoCapture
+            'camera_info_topic': None,
+            'detection_frame': 'camera_link',  # Frame where detection happens
+            'calibration_frame': 'camera_link',  # Frame in hand-eye calibration
+        },
+        'd405': {
+            'handeye_yaml': 'd405_handeyecalibration_eye_on_hand.yaml',
+            'intrinsics_yaml': None,  # Get from camera_info topic
+            'image_topic': '/camera/color/image_raw',
+            'camera_info_topic': '/camera/color/camera_info',
+            'detection_frame': 'camera_color_optical_frame',  # Frame where detection happens
+            'calibration_frame': 'camera_link',  # Frame in hand-eye calibration
+        },
+    }
+
+    def __init__(self, enable_ros_tf=True, camera_type='usb'):
+        self.T_tool0_camlink = None  # Hand-eye: tool0 -> camera_link
+        self.handeye_quat = None  # Store quaternion for TF publishing
+        self.handeye_trans = None  # Store translation for TF publishing
         self.ros_ok = False
         self.tf_buffer = None
         self.tf_listener = None
         self.tf_broadcaster = None
         self.shared_detection_mode = 'cubes'
+        self.camera_type = camera_type
+        self.camera_config = self.CAMERA_CONFIGS.get(camera_type, self.CAMERA_CONFIGS['usb'])
         self._load_handeye_transform()
 
         if enable_ros_tf:
             try:
                 import rospy  # noqa: F401
                 import tf2_ros  # noqa: F401
-                # Ensure String is available when running with ROS
                 from std_msgs.msg import String  # noqa: F401
 
                 if not hasattr(self, "rospy"):
-                    # Bind for internal use without making them hard deps for import
                     self.rospy = __import__("rospy")
                     self.tf2_ros = __import__("tf2_ros")
 
                 if not self.rospy.core.is_initialized():
-                    # Anonymous node allows reuse if already running
-                    self.rospy.init_node("camera_a4_transform", anonymous=True, disable_signals=True)
+                    self.rospy.init_node("camera_detection_transform", anonymous=True, disable_signals=True)
 
                 self.tf_buffer = self.tf2_ros.Buffer()
                 self.tf_listener = self.tf2_ros.TransformListener(self.tf_buffer)
                 self.tf_broadcaster = self.tf2_ros.TransformBroadcaster()
                 self.ros_ok = True
                 self.mode_sub = self.rospy.Subscriber('vision/mode', String, self._on_mode)
+                
+                # Start publishing hand-eye TF periodically
+                if self.T_tool0_camlink is not None:
+                    import threading
+                    self._tf_publish_thread = threading.Thread(target=self._publish_handeye_tf_loop, daemon=True)
+                    self._tf_publish_thread.start()
 
-            except Exception:
-                # If rospy is available but tf2_ros failed, still enable ROS pub/sub
+            except Exception as e:
+                print(f"[TransformHelper] TF setup error: {e}")
                 try:
                     if rospy is not None:
                         self.rospy = rospy
@@ -97,23 +129,26 @@ class TransformHelper:
                     else:
                         self.ros_ok = False
                 except Exception:
-                    # ROS not available at all
                     self.ros_ok = False
 
     def _load_handeye_transform(self):
-        # Try user-specified path first, then fallback to script directory
-        yaml_path = "/home/xuanya/.ros/easy_handeye/usb_handeyecalibration_eye_on_hand.yaml"
+        """Load hand-eye calibration. Stores T_tool0_camlink (tool0 -> camera_link)."""
+        handeye_filename = self.camera_config['handeye_yaml']
+        yaml_path = os.path.expanduser(f"~/.ros/easy_handeye/{handeye_filename}")
         if not os.path.exists(yaml_path):
-            yaml_path = os.path.join(os.path.dirname(__file__), "usb_handeyecalibration_eye_on_hand.yaml")
+            yaml_path = os.path.join(os.path.dirname(__file__), handeye_filename)
         if not os.path.exists(yaml_path):
-            self.T_cam_tool0 = None
+            print(f"[TransformHelper] Warning: Hand-eye calibration file not found: {handeye_filename}")
+            self.T_tool0_camlink = None
             return
 
         try:
             with open(yaml_path, "r") as f:
                 data = yaml.safe_load(f)
-        except Exception:
-            self.T_cam_tool0 = None
+            print(f"[TransformHelper] Loaded hand-eye calibration from: {yaml_path}")
+        except Exception as e:
+            print(f"[TransformHelper] Error loading hand-eye calibration: {e}")
+            self.T_tool0_camlink = None
             return
 
         t = (data or {}).get("transformation", {})
@@ -125,26 +160,104 @@ class TransformHelper:
         ty = float(t.get("y", 0.0))
         tz = float(t.get("z", 0.0))
 
+        # Store for TF publishing
+        self.handeye_quat = (qx, qy, qz, qw)  # ROS uses (x, y, z, w)
+        self.handeye_trans = (tx, ty, tz)
+
+        # Build transformation matrix: T_tool0_camlink (tool0 -> camera_link)
         R = _quaternion_to_rotation_matrix(qw, qx, qy, qz)
         T = np.eye(4, dtype=np.float64)
         T[:3, :3] = R
         T[:3, 3] = np.array([tx, ty, tz], dtype=np.float64)
-        self.T_cam_tool0 = T
+        self.T_tool0_camlink = T
+        print(f"[TransformHelper] Hand-eye transform (tool0 -> camera_link): t=[{tx:.4f}, {ty:.4f}, {tz:.4f}]")
+
+    def _publish_handeye_tf_loop(self):
+        """Continuously publish hand-eye TF: tool0 -> camera_link."""
+        import geometry_msgs.msg
+        rate = self.rospy.Rate(50)  # 50 Hz
+        calibration_frame = self.camera_config['calibration_frame']
+        
+        while not self.rospy.is_shutdown():
+            try:
+                t = geometry_msgs.msg.TransformStamped()
+                t.header.stamp = self.rospy.Time.now()
+                t.header.frame_id = "tool0"
+                t.child_frame_id = calibration_frame
+                t.transform.translation.x = self.handeye_trans[0]
+                t.transform.translation.y = self.handeye_trans[1]
+                t.transform.translation.z = self.handeye_trans[2]
+                t.transform.rotation.x = self.handeye_quat[0]
+                t.transform.rotation.y = self.handeye_quat[1]
+                t.transform.rotation.z = self.handeye_quat[2]
+                t.transform.rotation.w = self.handeye_quat[3]
+                self.tf_broadcaster.sendTransform(t)
+                rate.sleep()
+            except Exception:
+                break
 
     def _on_mode(self, msg):
         m = (msg.data or '').strip().lower()
         if m in ('cubes', 'cans'):
             self.shared_detection_mode = m
 
+    def _get_optical_to_link_transform(self, timeout=0.5):
+        """Get transform from camera_color_optical_frame to camera_link via TF."""
+        if not self.ros_ok or self.tf_buffer is None:
+            return None
+        
+        detection_frame = self.camera_config['detection_frame']
+        calibration_frame = self.camera_config['calibration_frame']
+        
+        if detection_frame == calibration_frame:
+            return np.eye(4, dtype=np.float64)
+        
+        try:
+            tr = self.tf_buffer.lookup_transform(
+                calibration_frame, detection_frame,
+                self.rospy.Time(0), self.rospy.Duration.from_sec(timeout)
+            )
+            t = tr.transform.translation
+            r = tr.transform.rotation
+            R = _quaternion_to_rotation_matrix(r.w, r.x, r.y, r.z)
+            T = np.eye(4, dtype=np.float64)
+            T[:3, :3] = R
+            T[:3, 3] = np.array([t.x, t.y, t.z], dtype=np.float64)
+            return T
+        except Exception as e:
+            print(f"[TransformHelper] Cannot get transform {detection_frame} -> {calibration_frame}: {e}")
+            return None
+
+    def optical_to_camlink(self, P_optical):
+        """Transform point from detection frame (optical) to calibration frame (camera_link)."""
+        T = self._get_optical_to_link_transform()
+        if T is None:
+            return P_optical  # Fallback: assume same frame
+        P_h = np.array([P_optical[0], P_optical[1], P_optical[2], 1.0], dtype=np.float64)
+        P_link_h = T @ P_h
+        return P_link_h[:3]
 
     def camera_to_tool(self, Pc):
-        if self.T_cam_tool0 is None:
+        """Transform point from detection frame to tool0 frame."""
+        if self.T_tool0_camlink is None:
             return None
-        Pc_h = np.array([Pc[0], Pc[1], Pc[2], 1.0], dtype=np.float64)
-        Pt_h = self.T_cam_tool0 @ Pc_h
+        
+        # First transform from detection frame to camera_link
+        Pc_link = self.optical_to_camlink(Pc)
+        
+        # Then apply inverse of hand-eye: camera_link -> tool0
+        # T_tool0_camlink @ P_camlink would give P in a wrong frame
+        # We need: P_tool0 = inv(T_tool0_camlink) @ P_camlink ... wait, that's wrong
+        # Actually: T_tool0_camlink transforms points FROM camlink TO tool0? No...
+        # T_A_B represents pose of B in A, and transforms points FROM B TO A
+        # So T_tool0_camlink transforms points from camlink to tool0
+        
+        Pc_h = np.array([Pc_link[0], Pc_link[1], Pc_link[2], 1.0], dtype=np.float64)
+        Pt_h = self.T_tool0_camlink @ Pc_h
         return Pt_h[:3]
 
-    def camera_to_base(self, Pc, lookup_timeout=0.1):
+    def camera_to_base(self, Pc, lookup_timeout=0.5):
+        """Transform point from detection frame to base_link frame."""
         Pt = self.camera_to_tool(Pc)
         if Pt is None:
             return None
@@ -166,34 +279,145 @@ class TransformHelper:
             Pt_h = np.array([Pt[0], Pt[1], Pt[2], 1.0], dtype=np.float64)
             Pb_h = Tbt @ Pt_h
             return Pb_h[:3]
-        except Exception:
+        except Exception as e:
+            print(f"[TransformHelper] TF lookup base_link<-tool0 failed: {e}")
             return None
 
 
-def open_camera_with_transforms_dual_mode(camera_index=0, width=None, height=None, enable_ros_tf=True, publish_topics=True, detection_mode="cubes"):
+def _ros_image_to_cv2(msg):
+    """Convert ROS Image message to OpenCV image without cv_bridge C++ backend.
+    
+    This avoids library conflicts (libffi) that can occur in some Docker environments.
+    """
+    # Determine the number of channels and dtype based on encoding
+    encoding = msg.encoding.lower()
+    
+    if encoding in ('bgr8', 'rgb8'):
+        dtype = np.uint8
+        channels = 3
+    elif encoding in ('bgra8', 'rgba8'):
+        dtype = np.uint8
+        channels = 4
+    elif encoding == 'mono8':
+        dtype = np.uint8
+        channels = 1
+    elif encoding == 'mono16':
+        dtype = np.uint16
+        channels = 1
+    elif encoding in ('16uc1',):
+        dtype = np.uint16
+        channels = 1
+    elif encoding in ('32fc1',):
+        dtype = np.float32
+        channels = 1
+    else:
+        # Fallback: try to parse common encodings
+        dtype = np.uint8
+        channels = 3
+    
+    # Convert raw data to numpy array
+    img = np.frombuffer(msg.data, dtype=dtype)
+    img = img.reshape((msg.height, msg.width, channels) if channels > 1 else (msg.height, msg.width))
+    
+    # Convert RGB to BGR if needed (OpenCV uses BGR)
+    if encoding == 'rgb8':
+        img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
+    elif encoding == 'rgba8':
+        img = cv2.cvtColor(img, cv2.COLOR_RGBA2BGRA)
+    
+    return img
+
+
+class D405ImageReceiver:
+    """Helper class to receive images from D405 via ROS topics."""
+    
+    def __init__(self, image_topic, camera_info_topic):
+        self.latest_frame = None
+        self.camera_matrix = None
+        self.dist_coeffs = None
+        self.frame_received = False
+        
+        if rospy is None:
+            raise RuntimeError("ROS not available for D405 camera")
+        
+        # Subscribe to image and camera_info topics
+        self.image_sub = rospy.Subscriber(image_topic, Image, self._on_image, queue_size=1)
+        self.info_sub = rospy.Subscriber(camera_info_topic, CameraInfo, self._on_camera_info, queue_size=1)
+        print(f"[D405] Subscribed to {image_topic} and {camera_info_topic}")
+    
+    def _on_image(self, msg):
+        try:
+            # Use manual conversion instead of cv_bridge to avoid library conflicts
+            self.latest_frame = _ros_image_to_cv2(msg)
+            self.frame_received = True
+        except Exception as e:
+            print(f"[D405] Error converting image: {e}")
+    
+    def _on_camera_info(self, msg):
+        if self.camera_matrix is None:
+            K = np.array(msg.K, dtype=np.float64).reshape(3, 3)
+            D = np.array(msg.D, dtype=np.float64)
+            self.camera_matrix = K
+            self.dist_coeffs = D if len(D) > 0 else np.zeros(5, dtype=np.float64)
+            print(f"[D405] Camera intrinsics received: fx={K[0,0]:.2f}, fy={K[1,1]:.2f}, cx={K[0,2]:.2f}, cy={K[1,2]:.2f}")
+    
+    def get_frame(self):
+        return self.latest_frame
+    
+    def get_intrinsics(self):
+        return self.camera_matrix, self.dist_coeffs
+
+
+def open_camera_with_transforms_dual_mode(camera_index=0, width=None, height=None, enable_ros_tf=True, publish_topics=True, detection_mode="cubes", camera_type='usb'):
     """Open camera feed with dual detection modes: 'cubes' for cube detection, 'cans' for can detection.
     
     - detection_mode: "cubes" or "cans"
-    - Camera intrinsics loaded from `head_camera.yaml` in this directory, scaled to stream size
-    - Hand-eye calibration loaded from `usb_handeyecalibration_eye_on_hand.yaml` in this directory  
+    - camera_type: "usb" for USB camera, "d405" for Intel RealSense D405
+    - For USB camera: intrinsics loaded from `head_camera.yaml`, hand-eye from `usb_handeyecalibration_eye_on_hand.yaml`
+    - For D405: intrinsics from ROS topic, hand-eye from `d405_handeyecalibration_eye_on_hand.yaml`
     - If ROS TF is available, transforms to `base_link` using `base_link <- tool0`
     """
-    cap = cv2.VideoCapture(camera_index)
-    if width is not None and height is not None:
-        cap.set(cv2.CAP_PROP_FRAME_WIDTH, width)
-        cap.set(cv2.CAP_PROP_FRAME_HEIGHT, height)
+    # Initialize camera based on type
+    cap = None
+    d405_receiver = None
+    
+    if camera_type == 'd405':
+        print(f"[D405] Initializing Intel RealSense D405 camera...")
+        # Initialize ROS node if not already initialized
+        if rospy is not None and not rospy.core.is_initialized():
+            rospy.init_node("camera_d405_detection", anonymous=True, disable_signals=True)
+        
+        config = TransformHelper.CAMERA_CONFIGS['d405']
+        d405_receiver = D405ImageReceiver(config['image_topic'], config['camera_info_topic'])
+        
+        # Wait for first frame
+        print("[D405] Waiting for camera stream...")
+        timeout = 10.0
+        start_time = rospy.Time.now() if rospy else None
+        while not d405_receiver.frame_received:
+            if rospy:
+                rospy.sleep(0.1)
+                if (rospy.Time.now() - start_time).to_sec() > timeout:
+                    print("[D405] Error: Timeout waiting for camera stream")
+                    return
+        print("[D405] Camera stream received")
+    else:
+        cap = cv2.VideoCapture(camera_index)
+        if width is not None and height is not None:
+            cap.set(cv2.CAP_PROP_FRAME_WIDTH, width)
+            cap.set(cv2.CAP_PROP_FRAME_HEIGHT, height)
 
-    if not cap.isOpened():
-        print(f"Error: Could not open camera with index {camera_index}.")
-        return
+        if not cap.isOpened():
+            print(f"Error: Could not open camera with index {camera_index}.")
+            return
 
-    window_name = f"Camera Feed - {detection_mode.upper()} Detection"
+    window_name = f"Camera Feed ({camera_type.upper()}) - {detection_mode.upper()} Detection"
     cv2.namedWindow(window_name, cv2.WINDOW_NORMAL)
     if width is not None and height is not None:
         cv2.resizeWindow(window_name, width, height)
 
     # Transform helper (hand-eye + optional TF)
-    tf_helper = TransformHelper(enable_ros_tf=enable_ros_tf)
+    tf_helper = TransformHelper(enable_ros_tf=enable_ros_tf, camera_type=camera_type)
     from tf.transformations import quaternion_from_euler
     goal_orientation = quaternion_from_euler(0, np.pi, 0)
     
@@ -216,16 +440,25 @@ def open_camera_with_transforms_dual_mode(camera_index=0, width=None, height=Non
     px_to_m = None
 
     while True:
-        ret, frame = cap.read()
-        if not ret:
-            print("Can't receive frame (stream end?). Exiting ...")
-            break
+        # Get frame based on camera type
+        if camera_type == 'd405':
+            frame = d405_receiver.get_frame()
+            if frame is None:
+                if rospy:
+                    rospy.sleep(0.01)
+                continue
+            ret = True
+        else:
+            ret, frame = cap.read()
+            if not ret:
+                print("Can't receive frame (stream end?). Exiting ...")
+                break
 
         processed_frame = frame.copy()
         if tf_helper.ros_ok and hasattr(tf_helper, 'shared_detection_mode') and tf_helper.shared_detection_mode in ('cubes','cans'):
             detection_mode = tf_helper.shared_detection_mode
         # On-screen mode indicator
-        cv2.putText(processed_frame, f"MODE: {detection_mode.upper()} (via topic 'vision/mode')", (12, 28),
+        cv2.putText(processed_frame, f"MODE: {detection_mode.upper()} | CAM: {camera_type.upper()}", (12, 28),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 255), 2)
 
 
@@ -252,18 +485,29 @@ def open_camera_with_transforms_dual_mode(camera_index=0, width=None, height=Non
 
         # Intrinsics once (scaled to stream size)
         if camera_matrix is None:
-            # Try user-specified path first, then fallback to script directory
-            yaml_path = "/home/xuanya/.ros/camera_info/head_camera.yaml"
-            if not os.path.exists(yaml_path):
-                yaml_path = os.path.join(os.path.dirname(__file__), "head_camera.yaml")
             H, W = processed_frame.shape[:2]
-            if os.path.exists(yaml_path):
-                K, dist = load_intrinsics_from_yaml(yaml_path, (H, W, 3))
+            if camera_type == 'd405':
+                # Get intrinsics from D405 camera_info topic
+                K, dist = d405_receiver.get_intrinsics()
+                if K is not None:
+                    camera_matrix = K
+                    dist_coeffs = dist
+                else:
+                    # Fallback to default intrinsics
+                    camera_matrix = np.array([[600.0, 0.0, W / 2.0], [0.0, 600.0, H / 2.0], [0.0, 0.0, 1.0]], dtype=np.float32)
+                    dist_coeffs = np.zeros((1, 5), dtype=np.float32)
             else:
-                K = np.array([[600.0, 0.0, W / 2.0], [0.0, 600.0, H / 2.0], [0.0, 0.0, 1.0]], dtype=np.float32)
-                dist = np.zeros((1, 5), dtype=np.float32)
-            camera_matrix = K
-            dist_coeffs = dist
+                # USB camera: load from yaml file
+                yaml_path = os.path.expanduser("~/.ros/camera_info/head_camera.yaml")
+                if not os.path.exists(yaml_path):
+                    yaml_path = os.path.join(os.path.dirname(__file__), "head_camera.yaml")
+                if os.path.exists(yaml_path):
+                    K, dist = load_intrinsics_from_yaml(yaml_path, (H, W, 3))
+                else:
+                    K = np.array([[600.0, 0.0, W / 2.0], [0.0, 600.0, H / 2.0], [0.0, 0.0, 1.0]], dtype=np.float32)
+                    dist = np.zeros((1, 5), dtype=np.float32)
+                camera_matrix = K
+                dist_coeffs = dist
 
         # Estimate plane from A4 if corners found
         plane = None
@@ -394,11 +638,13 @@ def open_camera_with_transforms_dual_mode(camera_index=0, width=None, height=Non
         cv2.imshow(window_name, processed_frame)
         key = cv2.waitKey(1) & 0xFF
         if key == ord("q"):
-            cv2.imwrite(f"capture_{detection_mode}_detection.jpg", processed_frame)
-            print(f"Saved image with {detection_mode} detection overlay.")
+            cv2.imwrite(f"capture_{camera_type}_{detection_mode}_detection.jpg", processed_frame)
+            print(f"Saved image with {detection_mode} detection overlay ({camera_type} camera).")
             break
 
-    cap.release()
+    # Cleanup
+    if cap is not None:
+        cap.release()
     cv2.destroyAllWindows()
 
 
@@ -626,6 +872,32 @@ def detect_cubes_on_frame(frame):
 
 
 if __name__ == "__main__":
-    # Set width/height to your stream; if using Orbbec RGB, 1280x720 is typical.
-    open_camera_with_transforms_dual_mode(0, width=1280, height=720, enable_ros_tf=True)
+    parser = argparse.ArgumentParser(description='Camera object detection with hand-eye calibration')
+    parser.add_argument('--camera', '-c', type=str, default='usb', choices=['usb', 'd405'],
+                        help='Camera type: usb (default) or d405 (Intel RealSense D405)')
+    parser.add_argument('--width', '-W', type=int, default=640,
+                        help='Frame width (default: 640)')
+    parser.add_argument('--height', '-H', type=int, default=480,
+                        help='Frame height (default: 480)')
+    parser.add_argument('--index', '-i', type=int, default=0,
+                        help='USB camera index (default: 0, only for USB camera)')
+    parser.add_argument('--mode', '-m', type=str, default='cubes', choices=['cubes', 'cans'],
+                        help='Detection mode: cubes (default) or cans')
+    args = parser.parse_args()
+    
+    print(f"Starting camera detection with:")
+    print(f"  Camera type: {args.camera}")
+    print(f"  Resolution: {args.width}x{args.height}")
+    print(f"  Detection mode: {args.mode}")
+    if args.camera == 'usb':
+        print(f"  Camera index: {args.index}")
+    
+    open_camera_with_transforms_dual_mode(
+        camera_index=args.index,
+        width=args.width,
+        height=args.height,
+        enable_ros_tf=True,
+        camera_type=args.camera,
+        detection_mode=args.mode
+    )
 
