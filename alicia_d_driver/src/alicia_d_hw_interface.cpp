@@ -88,17 +88,10 @@ void AliciaDHardwareInterface::jointStateCallback(const sensor_msgs::JointState:
             size_t index = it->second;
             if (index < joint_positions_.size())
             {
-                // Driver publishes raw gripper value (0..1000) on /joint_states, but ros_control
-                // expects a position (meters). Convert only for the gripper joint.
-                if (msg->name[i] == "Gripper")
-                {
-                    raw_joint_positions_[index] = AliciaDDataParserControl::gripper_value_to_position(
-                        msg->position[i], gripper_type_);
-                }
-                else
-                {
-                    raw_joint_positions_[index] = msg->position[i];
-                }
+                // The driver already publishes all joints in ROS-standard units
+                // (radians for revolute, meters for prismatic/gripper) on /joint_states,
+                // so no conversion is needed here.
+                raw_joint_positions_[index] = msg->position[i];
             }
         }
     }
